@@ -22,9 +22,10 @@ final class UserResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'email' => $this->email,
-            'email_verified_at' => $this->email_verified_at?->toIso8601String(),
+            'role' => $this->role,
+            'is_active' => $this->is_active,
+            'courses_count' => $this->whenCounted('courses'),
             'created_at' => $this->created_at?->toIso8601String(),
-            'updated_at' => $this->updated_at?->toIso8601String(),
         ];
     }
 }

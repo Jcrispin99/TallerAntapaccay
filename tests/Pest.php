@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Models\User;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /*
@@ -43,7 +45,18 @@ expect()->extend('toBeOne', fn () => $this->toBe(1));
 |
 */
 
-function something(): void
+function actingAsAdmin(): User
 {
-    // ..
+    $admin = User::factory()->admin()->create();
+    Sanctum::actingAs($admin);
+
+    return $admin;
+}
+
+function actingAsTeacher(): User
+{
+    $teacher = User::factory()->create();
+    Sanctum::actingAs($teacher);
+
+    return $teacher;
 }

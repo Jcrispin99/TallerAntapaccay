@@ -12,6 +12,7 @@
         "laravel/framework": "^13.0",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0",
+        "openspout/openspout": "^5.13",
         "spatie/laravel-data": "^4.0",
         "spatie/laravel-query-builder": "^7.0"
     },
@@ -58,6 +59,10 @@
         "test:unit": [
             "@php artisan config:clear --ansi",
             "@php artisan test"
+        ],
+        "dev": [
+            "Composer\\Config::disableProcessTimeout",
+            "npx concurrently -c \"#93c5fd,#fdba74\" \"php artisan queue:listen --tries=1 --timeout=360\" \"npm run dev\" --names=queue,vite"
         ],
         "test": [
             "@test:lint",

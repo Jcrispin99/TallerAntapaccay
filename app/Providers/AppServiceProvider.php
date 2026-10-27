@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -25,6 +27,8 @@ final class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureRateLimiting();
+
+        Gate::define('admin', fn (User $user): bool => $user->isAdmin());
     }
 
     /**
@@ -33,14 +37,15 @@ final class AppServiceProvider extends ServiceProvider
     private function configureRateLimiting(): void
     {
         // Default API rate limiter - 60 requests per minute
-        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(60)->by($request->user()?->id ?: $request->ip()));
+        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(60)->by($request->ip()));
 
-        // Auth endpoints - more restrictive (prevent brute force)
-        RateLimiter::for('auth', fn (Request $request) => Limit::perMinute(5)->by($request->ip()));
+        // Login - per email and IP (brute force protection)
+        RateLimiter::for('login', fn (Request $request) => Limit::perMinute(5)->by(mb_strtolower($request->string('email')->toString()).'|'.$request->ip()));
 
-        // Authenticated user requests - higher limit
-        RateLimiter::for('authenticated', fn (Request $request) => $request->user()
-            ? Limit::perMinute(120)->by($request->user()->id)
-            : Limit::perMinute(60)->by($request->ip()));
+        // Starting and submitting evaluations
+        RateLimiter::for('attempts', fn (Request $request) => Limit::perMinute(20)->by($request->ip()));
+
+        // Panel for teachers and admins
+        RateLimiter::for('admin', fn (Request $request) => Limit::perMinute(300)->by($request->user()?->getAuthIdentifier() ?? $request->ip()));
     }
 }

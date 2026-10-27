@@ -7,159 +7,67 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-describe('Registration', function (): void {
-    it('registers a new user successfully', function (): void {
-        $response = $this->postJson('/api/v1/register', [
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-        ]);
-
-        $response->assertStatus(201)
-            ->assertJsonStructure([
-                'success',
-                'message',
-                'data' => [
-                    'user' => ['id', 'name', 'email'],
-                    'token',
-                ],
-            ])
-            ->assertJson([
-                'success' => true,
-                'message' => 'User registered successfully. Please check your email to verify your account.',
-            ]);
-
-        $this->assertDatabaseHas('users', [
-            'email' => 'test@example.com',
-        ]);
-    });
-
-    it('fails registration with invalid data', function (): void {
-        $response = $this->postJson('/api/v1/register', [
-            'name' => '',
-            'email' => 'invalid-email',
-            'password' => 'short',
-        ]);
-
-        $response->assertStatus(422);
-    });
-
-    it('fails registration with duplicate email', function (): void {
-        User::factory()->create(['email' => 'existing@example.com']);
-
-        $response = $this->postJson('/api/v1/register', [
-            'name' => 'Test User',
-            'email' => 'existing@example.com',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-        ]);
-
-        $response->assertStatus(422);
-    });
+beforeEach(function (): void {
+    $this->user = User::factory()->create(['email' => 'profe@example.com', 'password' => 'secreto123']);
 });
 
-describe('Login', function (): void {
-    it('logs in with valid credentials', function (): void {
-        $user = User::factory()->create([
-            'password' => bcrypt('password123'),
-        ]);
+it('logs in with email and password', function (): void {
+    $token = $this->postJson('/api/v1/auth/login', ['email' => 'PROFE@example.com', 'password' => 'secreto123'])
+        ->assertOk()
+        ->assertJsonPath('data.user.email', 'profe@example.com')
+        ->assertJsonPath('data.user.role', 'teacher')
+        ->json('data.token');
 
-        $response = $this->postJson('/api/v1/login', [
-            'email' => $user->email,
-            'password' => 'password123',
-        ]);
-
-        $response->assertStatus(200)
-            ->assertJsonStructure([
-                'success',
-                'message',
-                'data' => [
-                    'user' => ['id', 'name', 'email'],
-                    'token',
-                ],
-            ])
-            ->assertJson([
-                'success' => true,
-                'message' => 'Login successful',
-            ]);
-    });
-
-    it('fails login with invalid credentials', function (): void {
-        $user = User::factory()->create([
-            'password' => bcrypt('password123'),
-        ]);
-
-        $response = $this->postJson('/api/v1/login', [
-            'email' => $user->email,
-            'password' => 'wrongpassword',
-        ]);
-
-        $response->assertStatus(401)
-            ->assertJson([
-                'success' => false,
-                'message' => 'Invalid credentials',
-            ]);
-    });
-
-    it('fails login with non-existent user', function (): void {
-        $response = $this->postJson('/api/v1/login', [
-            'email' => 'nonexistent@example.com',
-            'password' => 'password123',
-        ]);
-
-        $response->assertStatus(401);
-    });
+    $this->getJson('/api/v1/auth/me', ['Authorization' => "Bearer {$token}"])
+        ->assertOk()
+        ->assertJsonPath('data.id', $this->user->id);
 });
 
-describe('Logout', function (): void {
-    it('logs out authenticated user', function (): void {
-        $user = User::factory()->create();
-        $token = $user->createToken('test-token')->plainTextToken;
-
-        $response = $this->withHeader('Authorization', 'Bearer '.$token)
-            ->postJson('/api/v1/logout');
-
-        $response->assertStatus(200)
-            ->assertJson([
-                'success' => true,
-                'message' => 'Logged out successfully',
-            ]);
-    });
-
-    it('fails logout without authentication', function (): void {
-        $response = $this->postJson('/api/v1/logout');
-
-        $response->assertStatus(401);
-    });
+it('rejects a wrong password', function (): void {
+    $this->postJson('/api/v1/auth/login', ['email' => 'profe@example.com', 'password' => 'otra-cosa'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('email');
 });
 
-describe('Me', function (): void {
-    it('returns authenticated user data', function (): void {
-        $user = User::factory()->create();
-        $token = $user->createToken('test-token')->plainTextToken;
+it('rejects deactivated accounts', function (): void {
+    $this->user->update(['is_active' => false]);
 
-        $response = $this->withHeader('Authorization', 'Bearer '.$token)
-            ->getJson('/api/v1/me');
+    $this->postJson('/api/v1/auth/login', ['email' => 'profe@example.com', 'password' => 'secreto123'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('email');
+});
 
-        $response->assertStatus(200)
-            ->assertJsonStructure([
-                'success',
-                'message',
-                'data' => ['id', 'name', 'email'],
-            ])
-            ->assertJson([
-                'success' => true,
-                'data' => [
-                    'id' => $user->id,
-                    'email' => $user->email,
-                ],
-            ]);
-    });
+it('logs out by revoking the token', function (): void {
+    $token = $this->postJson('/api/v1/auth/login', ['email' => 'profe@example.com', 'password' => 'secreto123'])->json('data.token');
 
-    it('fails without authentication', function (): void {
-        $response = $this->getJson('/api/v1/me');
+    $this->postJson('/api/v1/auth/logout', [], ['Authorization' => "Bearer {$token}"])->assertOk();
 
-        $response->assertStatus(401);
-    });
+    expect($this->user->tokens()->count())->toBe(0);
+});
+
+it('protects the panel', function (): void {
+    $this->getJson('/api/v1/admin/courses')->assertUnauthorized();
+    $this->getJson('/api/v1/auth/me')->assertUnauthorized();
+});
+
+it('changes the own password', function (): void {
+    actingAsTeacher();
+
+    $this->putJson('/api/v1/auth/password', [
+        'current_password' => 'password',
+        'password' => 'nueva-clave-1',
+        'password_confirmation' => 'nueva-clave-1',
+    ])->assertOk();
+
+    $this->putJson('/api/v1/auth/password', [
+        'current_password' => 'incorrecta',
+        'password' => 'nueva-clave-2',
+        'password_confirmation' => 'nueva-clave-2',
+    ])->assertUnprocessable()->assertJsonValidationErrors('current_password');
+});
+
+it('creates the first admin from the command line', function (): void {
+    $this->artisan('app:create-admin', ['email' => 'Jefa@example.com', '--password' => 'super-secreto'])->assertSuccessful();
+
+    expect(User::query()->where('email', 'jefa@example.com')->sole()->isAdmin())->toBeTrue();
 });

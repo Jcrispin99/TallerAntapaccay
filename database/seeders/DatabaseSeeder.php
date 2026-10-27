@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -14,14 +13,12 @@ final class DatabaseSeeder extends Seeder
 
     /**
      * Seed the application's database.
+     *
+     * Accounts are not seeded: create the first admin with
+     * `php artisan app:create-admin {email}` and the rest from the panel.
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        //
     }
 }

@@ -5,143 +5,72 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Api\ApiController;
-use App\Http\Requests\Api\V1\ForgotPasswordRequest;
 use App\Http\Requests\Api\V1\LoginRequest;
-use App\Http\Requests\Api\V1\RegisterRequest;
-use App\Http\Requests\Api\V1\ResendVerificationRequest;
-use App\Http\Requests\Api\V1\ResetPasswordRequest;
-use App\Http\Requests\Api\V1\VerifyEmailRequest;
+use App\Http\Requests\Api\V1\UpdatePasswordRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
-use Illuminate\Auth\Events\PasswordReset;
-use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Password;
+use Illuminate\Validation\ValidationException;
 
+/**
+ * Login for teachers and admins of the panel (Sanctum bearer tokens).
+ */
 final class AuthController extends ApiController
 {
-    public function register(RegisterRequest $request): JsonResponse
-    {
-        $user = User::query()->create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
+    private const int TOKEN_DAYS = 7;
 
-        $user->sendEmailVerificationNotification();
-
-        $token = $user->createToken('auth-token')->plainTextToken;
-
-        return $this->created([
-            'user' => new UserResource($user),
-            'token' => $token,
-        ], 'User registered successfully. Please check your email to verify your account.');
-    }
-
+    /**
+     * @throws ValidationException
+     */
     public function login(LoginRequest $request): JsonResponse
     {
-        $user = User::query()->where('email', $request->email)->first();
+        $user = User::query()->where('email', mb_strtolower($request->email))->first();
 
-        if (! $user || ! Hash::check($request->password, $user->password)) {
-            return $this->unauthorized('Invalid credentials');
+        if ($user === null || ! Hash::check($request->password, $user->password)) {
+            throw ValidationException::withMessages(['email' => 'El correo o la contraseña no son correctos.']);
         }
 
-        $token = $user->createToken('auth-token')->plainTextToken;
+        if (! $user->is_active) {
+            throw ValidationException::withMessages(['email' => 'Tu cuenta está desactivada. Habla con un administrador.']);
+        }
 
-        return $this->success([
-            'user' => new UserResource($user),
-            'token' => $token,
-        ], 'Login successful');
+        $token = $user->createToken('panel', expiresAt: now()->addDays(self::TOKEN_DAYS))->plainTextToken;
+
+        return $this->success(['user' => new UserResource($user), 'token' => $token], 'Sesión iniciada');
     }
 
     public function logout(Request $request): JsonResponse
     {
-        /** @var User $user */
-        $user = $request->user();
-        $user->currentAccessToken()->delete();
+        $this->user($request)->currentAccessToken()->delete();
 
-        return $this->success(message: 'Logged out successfully');
+        return $this->success(message: 'Sesión cerrada');
     }
 
     public function me(Request $request): JsonResponse
     {
-        return $this->success(new UserResource($request->user()));
+        return $this->success(new UserResource($this->user($request)));
     }
 
-    public function verifyEmail(VerifyEmailRequest $request): JsonResponse
+    /**
+     * Changing the password signs out every other session.
+     */
+    public function updatePassword(UpdatePasswordRequest $request): JsonResponse
     {
-        /** @var User $user */
+        $user = $this->user($request);
+        $user->update(['password' => $request->password]);
+
+        $user->tokens()->whereKeyNot($user->currentAccessToken()->getKey())->delete();
+
+        return $this->success(message: 'Contraseña actualizada');
+    }
+
+    private function user(Request $request): User
+    {
         $user = $request->user();
+        assert($user instanceof User);
 
-        if ($user->hasVerifiedEmail()) {
-            return $this->success(message: 'Email already verified');
-        }
-
-        if ($user->markEmailAsVerified()) {
-            event(new Verified($user));
-        }
-
-        return $this->success(message: 'Email verified successfully');
-    }
-
-    public function resendVerificationEmail(ResendVerificationRequest $request): JsonResponse
-    {
-        $user = User::query()->where('email', $request->email)->first();
-
-        if (! $user) {
-            return $this->notFound('User not found');
-        }
-
-        if ($user->hasVerifiedEmail()) {
-            return $this->error('Email already verified', 400);
-        }
-
-        $user->sendEmailVerificationNotification();
-
-        return $this->success(message: 'Verification email sent successfully');
-    }
-
-    public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
-    {
-        $status = Password::sendResetLink(
-            $request->only('email')
-        );
-
-        if ($status === Password::RESET_LINK_SENT) {
-            return $this->success(message: 'Password reset link sent to your email');
-        }
-
-        return $this->error('Unable to send reset link', 500);
-    }
-
-    public function resetPassword(ResetPasswordRequest $request): JsonResponse
-    {
-        $status = Password::reset(
-            $request->only('email', 'password', 'password_confirmation', 'token'),
-            function (User $user, string $password): void {
-                $user->forceFill([
-                    'password' => Hash::make($password),
-                ])->save();
-
-                $user->tokens()->delete();
-
-                event(new PasswordReset($user));
-            }
-        );
-
-        if ($status === Password::PASSWORD_RESET) {
-            return $this->success(message: 'Password reset successfully');
-        }
-
-        return $this->error(
-            match ($status) {
-                Password::INVALID_TOKEN => 'Invalid or expired reset token',
-                Password::INVALID_USER => 'User not found',
-                default => 'Unable to reset password',
-            },
-            400
-        );
+        return $user;
     }
 }
