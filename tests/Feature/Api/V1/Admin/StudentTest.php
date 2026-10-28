@@ -110,6 +110,17 @@ it('imports an Excel file with separate first and last names', function (): void
         ->gerencia->toBe('Operaciones');
 });
 
+it('recognizes the columns of the downloadable template', function (): void {
+    actingAsAdmin();
+    $path = tempnam(sys_get_temp_dir(), 'xlsx').'.xlsx';
+    copy(public_path('plantillas/plantilla-alumnos.xlsx'), $path);
+
+    $this->post('/api/v1/admin/students/import', ['file' => new UploadedFile($path, 'plantilla-alumnos.xlsx', null, null, true)], ['Accept' => 'application/json'])
+        ->assertOk()
+        ->assertJsonPath('data.created', 0)
+        ->assertJsonPath('data.errors', []);
+});
+
 it('explains when the columns are missing', function (): void {
     actingAsAdmin();
 

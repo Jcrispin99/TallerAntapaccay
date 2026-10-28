@@ -286,17 +286,6 @@ function DeleteStudentButton({ student }: { student: Student }) {
     );
 }
 
-/** Semicolon-separated with BOM, so it opens in columns in Excel configured in Spanish. */
-function downloadTemplate() {
-    const csv = '﻿DNI;Nombre completo;Gerencia;Puesto\r\n12345678;Pérez Ruiz, Ana;Operaciones;Supervisora\r\n';
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'plantilla-alumnos.csv';
-    link.click();
-    URL.revokeObjectURL(url);
-}
-
 function ImportDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
     const importer = useImportStudents();
     const inputRef = useRef<HTMLInputElement>(null);
@@ -370,9 +359,12 @@ function ImportDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
                 )}
 
                 <DialogFooter className="sm:justify-between">
-                    <Button variant="ghost" onClick={downloadTemplate}>
-                        <DownloadIcon />
-                        Descargar plantilla
+                    {/* Static file in public/plantillas: DNI column as text, with an instructions sheet. */}
+                    <Button asChild variant="ghost">
+                        <a href="/plantillas/plantilla-alumnos.xlsx" download>
+                            <DownloadIcon />
+                            Descargar plantilla
+                        </a>
                     </Button>
                     <Button variant="outline" onClick={() => close(false)}>
                         {result ? 'Listo' : 'Cerrar'}
