@@ -8,6 +8,10 @@
         @vite(['resources/css/app.css', 'resources/js/main.tsx'])
     </head>
     <body class="antialiased">
-        <div id="app"></div>
+        <div
+            id="app"
+            data-max-video-mb="{{ config('platform.max_video_mb') }}"
+            data-max-presentation-mb="{{ config('platform.max_presentation_mb') }}"
+        ></div>
     </body>
 </html>

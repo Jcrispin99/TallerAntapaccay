@@ -79,6 +79,13 @@ npm run typecheck   # TypeScript
 - Los DNI numéricos se completan con ceros a 8 dígitos, porque Excel suele borrar el cero inicial. Lo mismo se hace con lo que escribe el alumno, así que ambos coinciden.
 - Cada intento guarda una copia del nombre, la gerencia y el puesto del alumno en ese momento. Los resultados y el CSV mantienen esos datos aunque luego cambie o se quite de la lista.
 
+## Material obligatorio antes de rendir
+
+- Si un curso tiene material y evaluación, el alumno ingresa su DNI al entrar al curso. Su avance en cada material queda registrado, y el botón *Rendir evaluación* se habilita cuando lo termina todo. El servidor también lo exige al empezar un intento.
+- **Videos:** se deben ver completos. Se pueden pausar y retroceder, pero no adelantar más allá de lo ya visto, y al volver continúan donde quedaron. El servidor solo acepta un avance posible en el tiempo real transcurrido (hasta 2x), así que no se puede marcar un video como visto con una sola petición.
+- **Presentaciones:** cuentan como vistas al abrirlas (o al descargarlas, si no se pudieron convertir).
+- La duración de cada video se lee en el navegador del profesor al subirlo. El subidor avisa antes de enviar si el archivo supera `MAX_VIDEO_MB`. En producción el límite es de 100 MB, porque Cloudflare corta las subidas más grandes: graba en 720p o comprime el video.
+
 ## Cómo se califica
 
 - **Opción única / desplegable**: puntaje completo si elige la opción correcta.

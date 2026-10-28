@@ -95,9 +95,13 @@ export function useUploadMaterial(courseId: number) {
     const invalidate = useInvalidateCourse(courseId);
 
     return useMutation({
-        mutationFn: ({ file, onProgress }: { file: File; onProgress: (percent: number) => void }) => {
+        mutationFn: ({ file, duration, onProgress }: { file: File; duration: number | null; onProgress: (percent: number) => void }) => {
             const form = new FormData();
             form.append('file', file);
+
+            if (duration !== null) {
+                form.append('duration', String(duration));
+            }
 
             return unwrap(
                 api.post<ApiEnvelope<AdminMaterial>>(`/admin/courses/${courseId}/materials`, form, {

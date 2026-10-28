@@ -11,14 +11,14 @@ use App\Http\Requests\Api\V1\SubmitAttemptRequest;
 use App\Http\Resources\AttemptResource;
 use App\Models\Attempt;
 use App\Models\Evaluation;
-use App\Models\Student;
 use App\Services\EvaluationGrader;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Students are identified only by their DNI (it must be on the student list);
- * the attempt token returned on start is what lets them submit and see their result.
+ * Students are identified only by their DNI (it must be on the student list)
+ * and must finish the course material first; the attempt token returned on
+ * start is what lets them submit and see their result.
  */
 final class AttemptController extends ApiController
 {
@@ -28,7 +28,7 @@ final class AttemptController extends ApiController
             return $this->notFound('Esta evaluación no está disponible.');
         }
 
-        $student = Student::query()->where('dni', $request->dni)->firstOrFail();
+        $student = $request->student();
 
         // A copy of the student's data, as it is today, stays with the attempt.
         $snapshot = [
@@ -47,6 +47,14 @@ final class AttemptController extends ApiController
             $inProgress->update($snapshot);
 
             return $this->success(new AttemptResource($inProgress), 'Intento retomado');
+        }
+
+        if (! $evaluation->course->isCompletedBy($student)) {
+            return $this->error(
+                'Antes de rendir la evaluación tienes que ver todo el material del curso.',
+                Response::HTTP_UNPROCESSABLE_ENTITY,
+                ['dni' => ['Primero mira todo el material del curso (los videos completos).']],
+            );
         }
 
         $used = $evaluation->attempts()->where('dni', $request->dni)->whereNotNull('submitted_at')->count();

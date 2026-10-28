@@ -11,7 +11,9 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -23,6 +25,7 @@ use Illuminate\Support\Facades\Storage;
  * @property string $path
  * @property string|null $mime
  * @property int $size
+ * @property int|null $duration_seconds
  * @property string|null $pdf_path
  * @property ConversionStatus $conversion_status
  * @property string|null $conversion_error
@@ -30,6 +33,7 @@ use Illuminate\Support\Facades\Storage;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Course $course
+ * @property-read Collection<int, MaterialView> $views
  */
 #[Fillable([
     'type',
@@ -38,6 +42,7 @@ use Illuminate\Support\Facades\Storage;
     'path',
     'mime',
     'size',
+    'duration_seconds',
     'pdf_path',
     'conversion_status',
     'conversion_error',
@@ -54,6 +59,14 @@ final class Material extends Model
     public function course(): BelongsTo
     {
         return $this->belongsTo(Course::class);
+    }
+
+    /**
+     * @return HasMany<MaterialView, $this>
+     */
+    public function views(): HasMany
+    {
+        return $this->hasMany(MaterialView::class);
     }
 
     public function url(): string
@@ -84,6 +97,7 @@ final class Material extends Model
             'type' => MaterialType::class,
             'conversion_status' => ConversionStatus::class,
             'size' => 'integer',
+            'duration_seconds' => 'integer',
             'position' => 'integer',
         ];
     }

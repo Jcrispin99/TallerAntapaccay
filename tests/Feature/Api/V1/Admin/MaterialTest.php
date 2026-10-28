@@ -24,10 +24,12 @@ it('uploads a video ready to play', function (): void {
 
     $response = $this->post("/api/v1/admin/courses/{$course->id}/materials", [
         'file' => UploadedFile::fake()->create('Clase 1.mp4', 2048, 'video/mp4'),
+        'duration' => 754,
     ])
         ->assertCreated()
         ->assertJsonPath('data.type', 'video')
         ->assertJsonPath('data.title', 'Clase 1')
+        ->assertJsonPath('data.duration_seconds', 754)
         ->assertJsonPath('data.conversion_status', 'ready');
 
     Storage::disk('public')->assertExists(Material::query()->sole()->path);

@@ -23,6 +23,7 @@ use Illuminate\Support\Collection;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Collection<int, Attempt> $attempts
+ * @property-read Collection<int, MaterialView> $materialViews
  */
 #[Fillable([
     'dni',
@@ -61,6 +62,14 @@ final class Student extends Model
     public function attempts(): HasMany
     {
         return $this->hasMany(Attempt::class);
+    }
+
+    /**
+     * @return HasMany<MaterialView, $this>
+     */
+    public function materialViews(): HasMany
+    {
+        return $this->hasMany(MaterialView::class);
     }
 
     protected static function booted(): void

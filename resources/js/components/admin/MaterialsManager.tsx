@@ -25,7 +25,8 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Spinner } from '@/components/ui/spinner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { conversionStatusLabels, formatBytes } from '@/lib/format';
+import { conversionStatusLabels, formatBytes, formatDuration } from '@/lib/format';
+import { isVideoFile, maxUploadMb, readVideoDuration } from '@/lib/platform';
 import { cn } from '@/lib/utils';
 
 const ACCEPT = '.mp4,.webm,.m4v,.mov,.ppt,.pptx,.odp,.pdf';
@@ -49,12 +50,26 @@ export function MaterialsManager({ course }: { course: AdminCourse }) {
     async function uploadFiles(files: FileList | File[]) {
         // One at a time: large videos in parallel would compete for the same bandwidth.
         for (const file of Array.from(files)) {
+            const isVideo = isVideoFile(file);
+            const maxMb = isVideo ? maxUploadMb.video : maxUploadMb.presentation;
+
+            // Checked here: an oversized upload is cut by the proxy before the server can explain why.
+            if (file.size > maxMb * 1024 * 1024) {
+                toast.error(`«${file.name}» pesa ${formatBytes(file.size)} y el máximo es ${maxMb} MB.`, {
+                    description: isVideo ? 'Grábalo en 720p o comprímelo (por ejemplo, con HandBrake) e inténtalo de nuevo.' : undefined,
+                    duration: 10_000,
+                });
+                continue;
+            }
+
             const key = `${file.name}-${file.size}-${Date.now()}`;
             setUploads((current) => [...current, { key, name: file.name, progress: 0 }]);
 
             try {
                 await upload.mutateAsync({
                     file,
+                    // Lets the server tell when a student watched the video to the end.
+                    duration: isVideo ? await readVideoDuration(file) : null,
                     onProgress: (progress) => setUploads((current) => current.map((u) => (u.key === key ? { ...u, progress } : u))),
                 });
                 toast.success(`«${file.name}» subido`);
@@ -96,7 +111,12 @@ export function MaterialsManager({ course }: { course: AdminCourse }) {
             >
                 <UploadCloudIcon className="size-8 text-muted-foreground" />
                 <span className="font-medium">Arrastra archivos aquí o haz clic para elegir</span>
-                <span className="text-sm text-muted-foreground">Videos (mp4, webm, mov) o presentaciones (ppt, pptx, odp, pdf)</span>
+                <span className="text-sm text-muted-foreground">
+                    Videos (mp4, webm, mov) de hasta {maxUploadMb.video} MB o presentaciones (ppt, pptx, odp, pdf) de hasta {maxUploadMb.presentation} MB
+                </span>
+                <span className="text-xs text-muted-foreground">
+                    Los alumnos deben ver cada video completo antes de rendir la evaluación. Si un video pesa más, grábalo en 720p o comprímelo.
+                </span>
             </button>
             <input
                 ref={inputRef}
@@ -153,6 +173,7 @@ function MaterialRow({ material, actions }: { material: AdminMaterial; actions: 
                 <p className="truncate font-medium">{material.title}</p>
                 <p className="truncate text-xs text-muted-foreground">
                     {material.original_name} · {formatBytes(material.size)}
+                    {material.duration_seconds !== null && ` · ${formatDuration(material.duration_seconds)}`}
                 </p>
             </div>
             <StatusBadge material={material} />

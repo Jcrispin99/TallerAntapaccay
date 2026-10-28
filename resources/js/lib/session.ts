@@ -21,3 +21,6 @@ export function writeSession(key: string, value: unknown): void {
         // Ignore: storage full or disabled.
     }
 }
+
+/** The student identified on a course page (a Learner), shared by every course in the tab. */
+export const LEARNER_KEY = 'learner';

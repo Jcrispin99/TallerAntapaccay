@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\AttemptController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CourseController;
 use App\Http\Controllers\Api\V1\EvaluationController;
+use App\Http\Controllers\Api\V1\MaterialProgressController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -35,6 +36,13 @@ Route::middleware('throttle:api')->name('api.v1.')->group(function (): void {
         Route::post('evaluations/{evaluation}/attempts', [AttemptController::class, 'store'])->name('attempts.store');
         Route::post('attempts/{attempt:token}/submit', [AttemptController::class, 'submit'])->name('attempts.submit');
     });
+});
+
+// Public: progress in the course material, required before the evaluation.
+// The player reports every few seconds, so it is limited per DNI rather than per IP.
+Route::middleware('throttle:progress')->name('api.v1.')->group(function (): void {
+    Route::post('courses/{course:slug}/progress', [MaterialProgressController::class, 'show'])->name('courses.progress');
+    Route::post('materials/{material}/progress', [MaterialProgressController::class, 'update'])->name('materials.progress');
 });
 
 // Panel login (Sanctum bearer tokens)

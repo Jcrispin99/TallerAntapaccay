@@ -25,6 +25,7 @@ final class MaterialResource extends JsonResource
             'original_name' => $this->original_name,
             'mime' => $this->mime,
             'size' => $this->size,
+            'duration_seconds' => $this->duration_seconds,
             'url' => $this->url(),
             'pdf_url' => $this->pdfUrl(),
             'conversion_status' => $this->conversion_status,

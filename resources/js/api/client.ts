@@ -43,7 +43,7 @@ export function errorMessage(error: unknown, fallback = 'Ocurrió un error inesp
         const body = error.response?.data as ErrorBody | undefined;
 
         if (error.response?.status === 413) {
-            return 'El archivo es demasiado grande para el servidor (revisa upload_max_filesize y post_max_size de PHP).';
+            return 'El archivo es demasiado grande para subirlo. Si es un video, grábalo en 720p o comprímelo e inténtalo de nuevo.';
         }
 
         const firstError = body?.errors ? Object.values(body.errors)[0]?.[0] : undefined;

@@ -18,6 +18,7 @@ export interface Material {
     original_name: string;
     mime: string | null;
     size: number;
+    duration_seconds: number | null;
     url: string;
     pdf_url: string | null;
     conversion_status: ConversionStatus;
@@ -37,6 +38,24 @@ export interface Course {
     materials_count?: number;
     materials?: Material[];
     evaluation?: { id: number; title: string; questions_count: number } | null;
+}
+
+/** A student's progress in one material of the course. */
+export interface MaterialProgress {
+    material_id: number;
+    seconds_watched: number;
+    completed: boolean;
+}
+
+/** The student identified on the course page, kept for the tab so the evaluation can reuse the DNI. */
+export interface Learner {
+    dni: string;
+    full_name: string;
+}
+
+export interface CourseProgress {
+    student: Learner;
+    progress: MaterialProgress[];
 }
 
 export type UserRole = 'admin' | 'teacher';

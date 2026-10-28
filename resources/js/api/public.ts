@@ -1,7 +1,7 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api, unwrap } from './client';
-import type { AnswerValues, ApiEnvelope, Attempt, Course, Evaluation } from './types';
+import type { AnswerValues, ApiEnvelope, Attempt, Course, CourseProgress, Evaluation, MaterialProgress } from './types';
 
 export function useCourses() {
     return useQuery({
@@ -17,6 +17,43 @@ export function useCourse(slug: string) {
         // Keep checking while a presentation is still being converted.
         refetchInterval: (query) =>
             query.state.data?.materials?.some((m) => m.conversion_status === 'pending' || m.conversion_status === 'processing') ? 5000 : false,
+    });
+}
+
+const progressKey = (slug: string, dni: string | null) => ['courses', slug, 'progress', dni];
+
+const fetchProgress = (slug: string, dni: string) => unwrap(api.post<ApiEnvelope<CourseProgress>>(`/courses/${slug}/progress`, { dni }));
+
+/** What the identified student has already seen of the course material. */
+export function useCourseProgress(slug: string, dni: string | null) {
+    return useQuery({
+        queryKey: progressKey(slug, dni),
+        queryFn: () => fetchProgress(slug, dni ?? ''),
+        enabled: dni !== null,
+        retry: false,
+    });
+}
+
+export function useIdentify(slug: string) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (dni: string) => fetchProgress(slug, dni),
+        onSuccess: (data) => queryClient.setQueryData(progressKey(slug, data.student.dni), data),
+    });
+}
+
+/** The player's report: the furthest second reached in a video, or just "opened" for a presentation. */
+export function useRecordProgress(slug: string, dni: string) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ materialId, seconds, duration }: { materialId: number; seconds?: number; duration?: number | null }) =>
+            unwrap(api.post<ApiEnvelope<MaterialProgress>>(`/materials/${materialId}/progress`, { dni, seconds, duration })),
+        onSuccess: (view) =>
+            queryClient.setQueryData<CourseProgress>(progressKey(slug, dni), (current) =>
+                current ? { ...current, progress: [...current.progress.filter((p) => p.material_id !== view.material_id), view] } : current,
+            ),
     });
 }
 

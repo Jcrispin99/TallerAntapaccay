@@ -33,6 +33,8 @@ final class StoreMaterialRequest extends FormRequest
         return [
             'file' => ['required', 'file', 'extensions:'.implode(',', $extensions)],
             'title' => ['nullable', 'string', 'max:255'],
+            // Seconds, read by the browser before uploading a video.
+            'duration' => ['nullable', 'integer', 'min:1', 'max:86400'],
         ];
     }
 

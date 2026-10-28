@@ -12,6 +12,16 @@ export function formatBytes(bytes: number): string {
     return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
+/** 754 → "12:34", 3725 → "1:02:05". */
+export function formatDuration(totalSeconds: number): string {
+    const seconds = Math.max(0, Math.floor(totalSeconds));
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = String(seconds % 60).padStart(2, '0');
+
+    return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
+}
+
 export function formatDateTime(iso: string | null): string {
     if (!iso) {
         return '—';

@@ -38,6 +38,7 @@ final class MaterialController extends ApiController
             'path' => $path,
             'mime' => $file->getClientMimeType(),
             'size' => $file->getSize(),
+            'duration_seconds' => $type === MaterialType::Video && $request->filled('duration') ? $request->integer('duration') : null,
             'pdf_path' => $isPdf ? $path : null,
             'conversion_status' => $type === MaterialType::Video || $isPdf ? ConversionStatus::Ready : ConversionStatus::Pending,
             'position' => $course->materials()->count(),

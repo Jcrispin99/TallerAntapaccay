@@ -6,6 +6,7 @@ namespace App\Models;
 
 use Database\Factories\CourseFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -83,6 +84,16 @@ final class Course extends Model
     public function evaluation(): HasOne
     {
         return $this->hasOne(Evaluation::class);
+    }
+
+    /**
+     * Whether the student finished every material, which they must do before taking the evaluation.
+     */
+    public function isCompletedBy(Student $student): bool
+    {
+        return $this->materials()
+            ->whereDoesntHave('views', fn (Builder $query) => $query->whereBelongsTo($student)->whereNotNull('completed_at'))
+            ->doesntExist();
     }
 
     protected static function booted(): void

@@ -6,7 +6,7 @@ import { AxiosError } from 'axios';
 
 import { errorMessage, isNotFound, validationErrors } from '@/api/client';
 import { useEvaluation, useStartAttempt, useSubmitAttempt } from '@/api/public';
-import type { AnswerValues, Attempt, Evaluation } from '@/api/types';
+import type { AnswerValues, Attempt, Evaluation, Learner } from '@/api/types';
 import { isAnswered, QuestionInput, type QuestionValue } from '@/components/public/QuestionInput';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { formatScore } from '@/lib/format';
-import { readSession, writeSession } from '@/lib/session';
+import { LEARNER_KEY, readSession, writeSession } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
@@ -90,7 +90,8 @@ export function EvaluationPage() {
 }
 
 function IdentifyForm({ evaluation, onStarted }: { evaluation: Evaluation; onStarted: (attempt: Attempt) => void }) {
-    const [dni, setDni] = useState('');
+    // Already entered on the course page to follow the material.
+    const [dni, setDni] = useState(() => readSession<Learner>(LEARNER_KEY)?.dni ?? '');
     const start = useStartAttempt(evaluation.id);
     const errors = validationErrors(start.error);
     const dniError = errors.dni?.[0] ?? (start.error && !errors.dni ? errorMessage(start.error) : undefined);
