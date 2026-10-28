@@ -16,9 +16,10 @@ final class DatabaseSeeder extends Seeder
      *
      * Accounts are not seeded: create the first admin with
      * `php artisan app:create-admin {email}` and the rest from the panel.
+     * The workshops are assigned to that admin.
      */
     public function run(): void
     {
-        //
+        $this->call(TalleresSeeder::class);
     }
 }
