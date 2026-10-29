@@ -22,6 +22,40 @@ export function formatDuration(totalSeconds: number): string {
     return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
 }
 
+const LOWERCASE_WORDS = new Set(['de', 'del', 'la', 'las', 'los', 'y']);
+
+function titleCase(text: string): string {
+    return text
+        .toLocaleLowerCase('es')
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((word, index) => (index > 0 && LOWERCASE_WORDS.has(word) ? word : word.charAt(0).toLocaleUpperCase('es') + word.slice(1)))
+        .join(' ');
+}
+
+/**
+ * The student list usually has "APELLIDOS, NOMBRES": "QUISPE ROJAS, ROSA" → "Rosa Quispe Rojas", first "Rosa".
+ * Without a comma the order is unknown, so the whole name is used.
+ */
+export function personName(fullName: string): { full: string; first: string } {
+    const [lastNames, firstNames] = fullName.split(',').map((part) => part.trim());
+
+    if (firstNames) {
+        const first = titleCase(firstNames);
+
+        return { full: `${first} ${titleCase(lastNames)}`, first: first.split(' ')[0] };
+    }
+
+    const full = titleCase(fullName);
+
+    return { full, first: full };
+}
+
+/** Only the last digits, for shared screens: "••••5678". */
+export function maskDni(dni: string): string {
+    return `••••${dni.slice(-4)}`;
+}
+
 export function formatDateTime(iso: string | null): string {
     if (!iso) {
         return '—';

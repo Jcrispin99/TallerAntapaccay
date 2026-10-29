@@ -47,7 +47,7 @@ final class AppServiceProvider extends ServiceProvider
 
         // Material progress - per DNI, so a group on the same network is not blocked, with a cap per IP
         RateLimiter::for('progress', fn (Request $request): array => [
-            Limit::perMinute(30)->by('dni:'.$request->string('dni')->upper()->toString().'|'.$request->ip()),
+            Limit::perMinute(60)->by('dni:'.$request->string('dni')->upper()->toString().'|'.$request->ip()),
             Limit::perMinute(600)->by('ip:'.$request->ip()),
         ]);
 

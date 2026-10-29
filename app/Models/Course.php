@@ -29,6 +29,7 @@ use Illuminate\Support\Str;
  * @property-read Collection<int, Material> $materials
  * @property-read Evaluation|null $evaluation
  * @property-read int|null $materials_count
+ * @property-read int|null $videos_count
  */
 #[Fillable([
     'title',

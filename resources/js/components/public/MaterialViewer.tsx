@@ -1,9 +1,8 @@
-import { DownloadIcon, FileWarningIcon, MaximizeIcon, MinimizeIcon, PlayIcon, Volume2Icon, VolumeXIcon } from 'lucide-react';
+import { DownloadIcon, FileWarningIcon, InfoIcon, PlayIcon, Volume2Icon, VolumeXIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import type { Material } from '@/api/types';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Spinner } from '@/components/ui/spinner';
 import { formatDuration } from '@/lib/format';
 
@@ -18,6 +17,11 @@ export interface Tracking {
 const REPORT_EVERY_SECONDS = 10;
 const CONFIRM_END_EVERY_MS = 4000;
 
+/**
+ * The material on screen. It is meant to sit inside the course page's stage
+ * (`.material-stage`), which handles cinema mode and full screen for every type:
+ * `data-stage-fill` marks what grows to fill the screen.
+ */
 export function MaterialViewer({ material, tracking }: { material: Material; tracking?: Tracking }) {
     if (material.type !== 'video') {
         return <PresentationViewer material={material} tracking={tracking} />;
@@ -29,7 +33,7 @@ export function MaterialViewer({ material, tracking }: { material: Material; tra
     }
 
     return (
-        <video key={material.id} src={material.url} controls preload="metadata" className="aspect-video w-full rounded-lg bg-black">
+        <video key={material.id} src={material.url} controls preload="metadata" data-stage-fill className="aspect-video w-full bg-black">
             Tu navegador no puede reproducir este video.
         </video>
     );
@@ -43,7 +47,6 @@ type PlayerState = 'idle' | 'playing' | 'stopped' | 'ended';
  * minimizing) stops it until the student comes back and continues.
  */
 function RequiredVideo({ material, tracking }: { material: Material; tracking: Tracking }) {
-    const container = useRef<HTMLDivElement>(null);
     const video = useRef<HTMLVideoElement>(null);
     const furthest = useRef(tracking.secondsWatched);
     const reported = useRef(tracking.secondsWatched);
@@ -54,7 +57,6 @@ function RequiredVideo({ material, tracking }: { material: Material; tracking: T
     const [position, setPosition] = useState(tracking.secondsWatched);
     const [duration, setDuration] = useState(material.duration_seconds ?? 0);
     const [muted, setMuted] = useState(false);
-    const [fullscreen, setFullscreen] = useState(false);
 
     function report(force = false) {
         const seconds = Math.floor(furthest.current);
@@ -73,16 +75,13 @@ function RequiredVideo({ material, tracking }: { material: Material; tracking: T
     useEffect(() => {
         const stop = () => video.current?.pause();
         const onVisibility = () => document.hidden && stop();
-        const onFullscreen = () => setFullscreen(document.fullscreenElement === container.current);
 
         document.addEventListener('visibilitychange', onVisibility);
         window.addEventListener('blur', stop);
-        document.addEventListener('fullscreenchange', onFullscreen);
 
         return () => {
             document.removeEventListener('visibilitychange', onVisibility);
             window.removeEventListener('blur', stop);
-            document.removeEventListener('fullscreenchange', onFullscreen);
             // Switching to another material keeps what was watched.
             report(true);
         };
@@ -105,8 +104,8 @@ function RequiredVideo({ material, tracking }: { material: Material; tracking: T
     }, [state]);
 
     return (
-        <div ref={container} className="overflow-hidden rounded-lg bg-black data-[fullscreen=true]:flex data-[fullscreen=true]:flex-col" data-fullscreen={fullscreen}>
-            <div className="relative aspect-video w-full data-[fullscreen=true]:aspect-auto data-[fullscreen=true]:flex-1" data-fullscreen={fullscreen}>
+        <div className="flex flex-col bg-black">
+            <div data-stage-fill className="relative aspect-video min-h-0 w-full">
                 <video
                     ref={video}
                     src={material.url}
@@ -114,7 +113,7 @@ function RequiredVideo({ material, tracking }: { material: Material; tracking: T
                     playsInline
                     disablePictureInPicture
                     controlsList="nodownload noplaybackrate noremoteplayback"
-                    className="h-full w-full object-contain"
+                    className="absolute inset-0 h-full w-full object-contain"
                     onContextMenu={(e) => e.preventDefault()}
                     onLoadedMetadata={(e) => {
                         if (Number.isFinite(e.currentTarget.duration)) {
@@ -157,36 +156,45 @@ function RequiredVideo({ material, tracking }: { material: Material; tracking: T
                     Tu navegador no puede reproducir este video.
                 </video>
 
+                {state === 'playing' && (
+                    <span className="pointer-events-none absolute top-3 left-3 flex items-center gap-1.5 rounded-sm bg-primary px-2 py-1 font-condensed text-xs font-bold tracking-wider text-primary-foreground">
+                        <span className="size-1.5 rounded-full bg-primary-foreground" />
+                        REPRODUCIENDO
+                    </span>
+                )}
+
                 {(state === 'idle' || state === 'stopped') && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 p-6 text-center text-sm text-white">
-                        <p className="max-w-md">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/75 p-6 text-center">
+                        <p className="max-w-md text-sm text-white/90 sm:text-base">
                             {state === 'idle'
                                 ? 'Este video debe verse completo, sin pausas y sin salir de esta página. Si cambias de pestaña o de aplicación, se detiene y ese tiempo no cuenta.'
                                 : 'El video se detuvo porque saliste de la página. Para que cuente, tiene que reproducirse completo.'}
                         </p>
-                        <Button size="lg" onClick={play}>
-                            <PlayIcon />
+                        <Button size="lg" className="h-12 px-6 font-condensed text-base font-bold tracking-wide uppercase" onClick={play}>
+                            <PlayIcon className="fill-current" />
                             {furthest.current > 1 ? `Continuar desde ${formatDuration(furthest.current)}` : 'Reproducir'}
                         </Button>
                     </div>
                 )}
 
                 {state === 'ended' && !tracking.completed && (
-                    <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/70 text-sm text-white">
+                    <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/75 text-sm text-white">
                         <Spinner />
                         Registrando que terminaste el video…
                     </div>
                 )}
             </div>
 
-            <div className="flex items-center gap-3 bg-black px-3 py-2 text-xs text-white">
-                <Progress value={duration > 0 ? (position / duration) * 100 : 0} className="h-1.5 flex-1 bg-white/20" />
-                <span className="tabular-nums">
+            <div className="flex items-center gap-3 bg-[#0e0f12] py-1.5 pr-2 pl-4 text-white">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/15">
+                    <div className="h-full bg-primary" style={{ width: `${duration > 0 ? (position / duration) * 100 : 0}%` }} />
+                </div>
+                <span className="text-sm text-white/80 tabular-nums">
                     {formatDuration(position)} / {formatDuration(duration)}
                 </span>
                 <button
                     type="button"
-                    className="rounded p-1 hover:bg-white/10"
+                    className="flex size-11 items-center justify-center rounded-md hover:bg-white/10"
                     aria-label={muted ? 'Activar sonido' : 'Silenciar'}
                     onClick={() => {
                         if (video.current) {
@@ -195,19 +203,13 @@ function RequiredVideo({ material, tracking }: { material: Material; tracking: T
                         }
                     }}
                 >
-                    {muted ? <VolumeXIcon className="size-4" /> : <Volume2Icon className="size-4" />}
+                    {muted ? <VolumeXIcon className="size-5" /> : <Volume2Icon className="size-5" />}
                 </button>
-                {document.fullscreenEnabled && (
-                    <button
-                        type="button"
-                        className="rounded p-1 hover:bg-white/10"
-                        aria-label={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
-                        onClick={() => (fullscreen ? document.exitFullscreen() : container.current?.requestFullscreen())}
-                    >
-                        {fullscreen ? <MinimizeIcon className="size-4" /> : <MaximizeIcon className="size-4" />}
-                    </button>
-                )}
             </div>
+            <p className="flex gap-2.5 bg-card px-4 py-2.5 text-sm text-card-foreground/85">
+                <InfoIcon className="mt-0.5 size-4 shrink-0 text-primary" />
+                Sin pausa ni adelantar. Si cambias de pestaña o de aplicación, el video se detiene y ese tiempo no cuenta.
+            </p>
         </div>
     );
 }
@@ -225,13 +227,13 @@ function PresentationViewer({ material, tracking }: { material: Material; tracki
     }, [pending, material.id, material.pdf_url]);
 
     if (material.pdf_url) {
-        return <iframe key={material.id} src={material.pdf_url} title={material.title} className="aspect-[4/3] w-full rounded-lg border bg-background" />;
+        return <iframe key={material.id} src={material.pdf_url} title={material.title} data-stage-fill className="aspect-[4/3] w-full bg-white" />;
     }
 
     if (material.conversion_status === 'failed') {
         return (
             <Placeholder>
-                <FileWarningIcon className="size-8 text-muted-foreground" />
+                <FileWarningIcon className="size-8" />
                 <p>No se pudo mostrar esta presentación en el navegador.</p>
                 <Button asChild variant="outline">
                     <a href={material.url} download={material.original_name} onClick={() => pending && tracking.onReport()}>
@@ -253,7 +255,7 @@ function PresentationViewer({ material, tracking }: { material: Material; tracki
 
 function Placeholder({ children }: { children: React.ReactNode }) {
     return (
-        <div className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-lg border bg-background p-6 text-center text-sm text-muted-foreground">
+        <div data-stage-fill className="flex aspect-video w-full flex-col items-center justify-center gap-3 bg-card p-6 text-center text-sm text-muted-foreground">
             {children}
         </div>
     );

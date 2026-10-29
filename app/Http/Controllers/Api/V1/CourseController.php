@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\MaterialType;
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Resources\CourseResource;
 use App\Models\Course;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Http\JsonResponse;
 
@@ -16,7 +18,7 @@ final class CourseController extends ApiController
     {
         $courses = Course::query()
             ->where('is_published', true)
-            ->withCount('materials')
+            ->withCount(['materials', 'materials as videos_count' => fn (Builder $query) => $query->where('type', MaterialType::Video)])
             ->with(['evaluation' => fn (HasOne $query) => $query->withCount('questions')])
             ->latest()
             ->get();

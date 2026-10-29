@@ -15,6 +15,10 @@ interface Props {
     invalid?: boolean;
 }
 
+/** A whole row per option, big enough to tap on a phone; the chosen one is highlighted. */
+const OPTION_ROW =
+    'flex min-h-14 cursor-pointer items-center gap-3.5 rounded-xl border-2 border-transparent bg-card px-4 py-3 text-base leading-snug font-normal transition-colors hover:border-muted-foreground/40 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/10 has-[[data-state=checked]]:font-semibold sm:text-lg';
+
 /** One question of the student form, rendered like its Google Forms counterpart. */
 export function QuestionInput({ question, value, onChange, invalid }: Props) {
     const id = `q-${question.id}`;
@@ -30,7 +34,7 @@ export function QuestionInput({ question, value, onChange, invalid }: Props) {
                     placeholder="Tu respuesta"
                     maxLength={255}
                     aria-invalid={invalid}
-                    className="max-w-md"
+                    className="h-12 max-w-md text-lg"
                 />
             );
 
@@ -41,30 +45,29 @@ export function QuestionInput({ question, value, onChange, invalid }: Props) {
                     value={typeof value === 'string' ? value : ''}
                     onChange={(event) => onChange(event.target.value)}
                     placeholder="Tu respuesta"
-                    rows={4}
+                    rows={5}
                     aria-invalid={invalid}
+                    className="text-lg"
                 />
             );
 
         case 'single_choice':
             return (
-                <RadioGroup value={selected[0] ? String(selected[0]) : ''} onValueChange={(v) => onChange([Number(v)])} aria-invalid={invalid}>
+                <RadioGroup value={selected[0] ? String(selected[0]) : ''} onValueChange={(v) => onChange([Number(v)])} aria-invalid={invalid} className="gap-2.5">
                     {question.options.map((option) => (
-                        <div key={option.id} className="flex items-center gap-3">
-                            <RadioGroupItem value={String(option.id)} id={`${id}-${option.id}`} />
-                            <Label htmlFor={`${id}-${option.id}`} className="font-normal">
-                                {option.label}
-                            </Label>
-                        </div>
+                        <Label key={option.id} htmlFor={`${id}-${option.id}`} className={OPTION_ROW}>
+                            <RadioGroupItem value={String(option.id)} id={`${id}-${option.id}`} className="size-5" />
+                            {option.label}
+                        </Label>
                     ))}
                 </RadioGroup>
             );
 
         case 'multiple_choice':
             return (
-                <div className="grid gap-3">
+                <div className="grid gap-2.5">
                     {question.options.map((option) => (
-                        <div key={option.id} className="flex items-center gap-3">
+                        <Label key={option.id} htmlFor={`${id}-${option.id}`} className={OPTION_ROW}>
                             <Checkbox
                                 id={`${id}-${option.id}`}
                                 checked={selected.includes(option.id)}
@@ -72,11 +75,10 @@ export function QuestionInput({ question, value, onChange, invalid }: Props) {
                                     onChange(checked ? [...selected, option.id] : selected.filter((optionId) => optionId !== option.id))
                                 }
                                 aria-invalid={invalid}
+                                className="size-5"
                             />
-                            <Label htmlFor={`${id}-${option.id}`} className="font-normal">
-                                {option.label}
-                            </Label>
-                        </div>
+                            {option.label}
+                        </Label>
                     ))}
                 </div>
             );
@@ -84,7 +86,7 @@ export function QuestionInput({ question, value, onChange, invalid }: Props) {
         case 'dropdown':
             return (
                 <Select value={selected[0] ? String(selected[0]) : ''} onValueChange={(v) => onChange([Number(v)])}>
-                    <SelectTrigger id={id} className="w-full max-w-md" aria-invalid={invalid}>
+                    <SelectTrigger id={id} className="h-12 w-full max-w-md text-base" aria-invalid={invalid}>
                         <SelectValue placeholder="Elige una opción" />
                     </SelectTrigger>
                     <SelectContent>

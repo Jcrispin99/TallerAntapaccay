@@ -36,8 +36,9 @@ export interface Course {
     slug: string;
     description: string | null;
     materials_count?: number;
+    videos_count?: number;
     materials?: Material[];
-    evaluation?: { id: number; title: string; questions_count: number } | null;
+    evaluation?: { id: number; title: string; questions_count: number; passing_score: number } | null;
 }
 
 /** A student's progress in one material of the course. */
@@ -51,6 +52,28 @@ export interface MaterialProgress {
 export interface Learner {
     dni: string;
     full_name: string;
+    gerencia?: string | null;
+}
+
+/** Where the student stands in one course (see LearnerProgressController). */
+export interface CourseStanding {
+    course_id: number;
+    materials_total: number;
+    materials_completed: number;
+    started: boolean;
+    evaluation: {
+        attempts_used: number;
+        max_attempts: number | null;
+        passed: boolean;
+        pending_review: boolean;
+        best_score: number | null;
+        max_score: number | null;
+    } | null;
+}
+
+export interface LearnerProgress {
+    student: Learner;
+    courses: CourseStanding[];
 }
 
 export interface CourseProgress {

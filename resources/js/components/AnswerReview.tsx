@@ -11,7 +11,7 @@ export function AnswerReview({ answer, index, children }: { answer: Answer; inde
     const { question } = answer;
 
     return (
-        <div className="space-y-3 rounded-lg border bg-background p-4">
+        <div className="space-y-3 rounded-lg border bg-card p-4">
             <div className="flex items-start justify-between gap-3">
                 <p className="font-medium">
                     {index + 1}. {question.prompt}

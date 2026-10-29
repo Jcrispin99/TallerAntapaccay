@@ -1,12 +1,11 @@
-import { ArrowLeftIcon, CheckCircle2Icon, ClockIcon, XCircleIcon } from 'lucide-react';
+import { CheckIcon, ClockIcon, XIcon } from 'lucide-react';
 import { Link, useParams } from 'react-router';
 
 import { useAttempt } from '@/api/public';
 import { AnswerReview } from '@/components/AnswerReview';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatDateTime, formatScore } from '@/lib/format';
+import { formatDateTime, formatScore, maskDni, personName } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
@@ -15,7 +14,7 @@ export function ResultPage() {
     const { data: attempt, isPending, error } = useAttempt(token);
 
     if (isPending) {
-        return <Skeleton className="mx-auto h-72 max-w-2xl rounded-xl" />;
+        return <Skeleton className="mx-auto h-72 max-w-3xl rounded-xl" />;
     }
 
     if (error || !attempt) {
@@ -24,55 +23,50 @@ export function ResultPage() {
 
     const status =
         attempt.status === 'pending_review'
-            ? { icon: ClockIcon, label: 'Pendiente de revisión', tone: 'text-amber-600', hint: 'Algunas respuestas se revisan a mano. Tu nota final puede subir.' }
+            ? { icon: ClockIcon, label: 'En revisión', tone: 'bg-primary text-primary-foreground', hint: 'Algunas respuestas se revisan a mano. Tu nota final puede subir.' }
             : attempt.passed
-              ? { icon: CheckCircle2Icon, label: 'Aprobado', tone: 'text-emerald-600', hint: null }
-              : { icon: XCircleIcon, label: 'Desaprobado', tone: 'text-destructive', hint: null };
+              ? { icon: CheckIcon, label: 'Aprobado', tone: 'bg-success text-background', hint: null }
+              : { icon: XIcon, label: 'Desaprobado', tone: 'bg-destructive text-background', hint: null };
 
     return (
-        <div className="mx-auto max-w-2xl space-y-4">
-            <Button asChild variant="ghost" size="sm" className="-ml-2">
-                <Link to={`/cursos/${attempt.evaluation.course_slug}`}>
-                    <ArrowLeftIcon />
-                    {attempt.evaluation.course_title}
-                </Link>
-            </Button>
+        <div className="mx-auto max-w-3xl space-y-6">
+            <Link to={`/cursos/${attempt.evaluation.course_slug}`} className="text-sm font-semibold text-primary hover:underline">
+                ← {attempt.evaluation.course_title}
+            </Link>
 
-            <Card className="border-t-4 border-t-primary text-center">
-                <CardHeader>
-                    <CardDescription>{attempt.evaluation.title}</CardDescription>
-                    <CardTitle className="text-5xl font-semibold tabular-nums">
-                        {formatScore(attempt.score)}
-                        <span className="text-2xl text-muted-foreground"> / {formatScore(attempt.max_score)}</span>
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                    {attempt.submitted_at ? (
-                        <>
-                            <p className={cn('flex items-center justify-center gap-2 text-lg font-medium', status.tone)}>
-                                <status.icon className="size-5" />
-                                {status.label}
-                            </p>
-                            {status.hint && <p className="text-sm text-muted-foreground">{status.hint}</p>}
-                            <p className="text-sm text-muted-foreground">
-                                DNI {attempt.dni}
-                                {attempt.full_name && ` · ${attempt.full_name}`} · enviado el {formatDateTime(attempt.submitted_at)}
-                                {attempt.evaluation.passing_score > 0 && ` · nota mínima ${formatScore(attempt.evaluation.passing_score)}`}
-                            </p>
-                        </>
-                    ) : (
-                        <p className="text-muted-foreground">Este intento todavía no fue enviado.</p>
-                    )}
-                </CardContent>
-            </Card>
+            <section className="rounded-xl bg-card p-6 text-center sm:p-8">
+                <p className="text-muted-foreground">{attempt.evaluation.title}</p>
+                {attempt.submitted_at ? (
+                    <div className="mt-4 space-y-4">
+                        <p className="font-condensed text-7xl leading-none font-bold tabular-nums sm:text-8xl">
+                            {formatScore(attempt.score)}
+                            <span className="text-3xl text-muted-foreground sm:text-4xl"> / {formatScore(attempt.max_score)}</span>
+                        </p>
+                        <p className={cn('mx-auto inline-flex items-center gap-2 rounded px-3 py-1 font-condensed text-lg font-bold tracking-wider uppercase', status.tone)}>
+                            <status.icon className="size-5" strokeWidth={3} />
+                            {status.label}
+                        </p>
+                        {status.hint && <p className="text-muted-foreground">{status.hint}</p>}
+                        <p className="text-sm text-muted-foreground">
+                            {attempt.full_name && `${personName(attempt.full_name).full} · `}DNI {maskDni(attempt.dni)} · enviado el {formatDateTime(attempt.submitted_at)}
+                            {attempt.evaluation.passing_score > 0 && ` · nota mínima ${formatScore(attempt.evaluation.passing_score)}`}
+                        </p>
+                    </div>
+                ) : (
+                    <p className="mt-4 text-muted-foreground">Este intento todavía no fue enviado.</p>
+                )}
+                <Button asChild size="lg" className="mt-6 h-12 px-6 font-condensed text-base font-bold tracking-wide uppercase">
+                    <Link to="/">Volver a mis talleres</Link>
+                </Button>
+            </section>
 
             {attempt.review && (
-                <div className="space-y-3">
-                    <h2 className="font-medium">Tus respuestas</h2>
+                <section className="space-y-3">
+                    <h2 className="font-condensed text-sm font-semibold tracking-widest text-muted-foreground uppercase">Tus respuestas</h2>
                     {attempt.review.map((answer, index) => (
                         <AnswerReview key={answer.id} answer={answer} index={index} />
                     ))}
-                </div>
+                </section>
             )}
         </div>
     );

@@ -42,6 +42,10 @@ export function errorMessage(error: unknown, fallback = 'Ocurrió un error inesp
     if (error instanceof AxiosError) {
         const body = error.response?.data as ErrorBody | undefined;
 
+        if (error.response?.status === 429) {
+            return 'Demasiadas solicitudes seguidas. Espera un minuto y vuelve a intentar.';
+        }
+
         if (error.response?.status === 413) {
             return 'El archivo es demasiado grande para subirlo. Si es un video, grábalo en 720p o comprímelo e inténtalo de nuevo.';
         }
