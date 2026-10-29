@@ -27,6 +27,7 @@ final class CourseResource extends JsonResource
             'description' => $this->description,
             'materials_count' => $this->whenCounted('materials'),
             'videos_count' => $this->whenCounted('videos_count'),
+            'links_count' => $this->whenCounted('links_count'),
             'materials' => MaterialResource::collection($this->whenLoaded('materials')),
             'evaluation' => $this->whenLoaded('evaluation', fn (): ?array => $evaluation !== null && $evaluation->is_published && $evaluation->questions_count > 0
                 ? ['id' => $evaluation->id, 'title' => $evaluation->title, 'questions_count' => $evaluation->questions_count, 'passing_score' => $evaluation->passing_score]

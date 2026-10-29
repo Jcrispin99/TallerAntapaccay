@@ -18,7 +18,11 @@ final class CourseController extends ApiController
     {
         $courses = Course::query()
             ->where('is_published', true)
-            ->withCount(['materials', 'materials as videos_count' => fn (Builder $query) => $query->where('type', MaterialType::Video)])
+            ->withCount([
+                'materials',
+                'materials as videos_count' => fn (Builder $query) => $query->where('type', MaterialType::Video),
+                'materials as links_count' => fn (Builder $query) => $query->where('type', MaterialType::Link),
+            ])
             ->with(['evaluation' => fn (HasOne $query) => $query->withCount('questions')])
             ->latest()
             ->get();

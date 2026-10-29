@@ -16,14 +16,16 @@ export interface Standing {
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
-/** "2 videos · 1 presentación · 5 preguntas" */
+/** "2 videos · 1 enlace · 1 presentación · 5 preguntas" */
 export function courseContents(course: Course): string {
     const videos = course.videos_count ?? course.materials?.filter((m) => m.type === 'video').length ?? 0;
-    const presentations = (course.materials_count ?? course.materials?.length ?? 0) - videos;
+    const links = course.links_count ?? course.materials?.filter((m) => m.type === 'link').length ?? 0;
+    const presentations = (course.materials_count ?? course.materials?.length ?? 0) - videos - links;
     const questions = course.evaluation?.questions_count ?? 0;
 
     return [
         videos > 0 && plural(videos, 'video', 'videos'),
+        links > 0 && plural(links, 'enlace', 'enlaces'),
         presentations > 0 && plural(presentations, 'presentación', 'presentaciones'),
         questions > 0 && plural(questions, 'pregunta', 'preguntas'),
     ]

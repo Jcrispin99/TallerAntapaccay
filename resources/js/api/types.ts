@@ -1,6 +1,6 @@
 // Mirrors the JSON resources in app/Http/Resources.
 
-export type MaterialType = 'video' | 'presentation';
+export type MaterialType = 'video' | 'presentation' | 'link';
 export type ConversionStatus = 'pending' | 'processing' | 'ready' | 'failed';
 export type QuestionType = 'short_text' | 'paragraph' | 'single_choice' | 'multiple_choice' | 'dropdown';
 export type AttemptStatus = 'in_progress' | 'pending_review' | 'graded';
@@ -37,6 +37,7 @@ export interface Course {
     description: string | null;
     materials_count?: number;
     videos_count?: number;
+    links_count?: number;
     materials?: Material[];
     evaluation?: { id: number; title: string; questions_count: number; passing_score: number } | null;
 }

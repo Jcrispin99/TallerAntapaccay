@@ -1,10 +1,10 @@
 import { arrayMove } from '@dnd-kit/sortable';
-import { ExternalLinkIcon, PencilIcon, PresentationIcon, RotateCwIcon, Trash2Icon, UploadCloudIcon, VideoIcon } from 'lucide-react';
+import { ExternalLinkIcon, LinkIcon, PencilIcon, PresentationIcon, RotateCwIcon, Trash2Icon, UploadCloudIcon, VideoIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react';
 import { toast } from 'sonner';
 
-import { useMaterialActions, useUploadMaterial } from '@/api/admin';
-import { errorMessage } from '@/api/client';
+import { useAddMaterialLink, useMaterialActions, useUploadMaterial } from '@/api/admin';
+import { errorMessage, validationErrors } from '@/api/client';
 import type { AdminCourse, AdminMaterial } from '@/api/types';
 import { DragHandle, SortableItem, SortableList } from '@/components/admin/Sortable';
 import {
@@ -20,11 +20,13 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Spinner } from '@/components/ui/spinner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { embedOf } from '@/lib/embed';
 import { conversionStatusLabels, formatBytes, formatDuration } from '@/lib/format';
 import { isVideoFile, maxUploadMb, readVideoDuration } from '@/lib/platform';
 import { cn } from '@/lib/utils';
@@ -118,6 +120,10 @@ export function MaterialsManager({ course }: { course: AdminCourse }) {
                     Los alumnos deben ver cada video completo antes de rendir la evaluación. Si un video pesa más, grábalo en 720p o comprímelo.
                 </span>
             </button>
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-background px-3 py-2 text-sm">
+                <span className="text-muted-foreground">¿El video ya está en YouTube, Vimeo o Google Drive? Agrégalo con su enlace.</span>
+                <AddLinkDialog courseId={course.id} />
+            </div>
             <input
                 ref={inputRef}
                 type="file"
@@ -160,8 +166,8 @@ export function MaterialsManager({ course }: { course: AdminCourse }) {
 }
 
 function MaterialRow({ material, actions }: { material: AdminMaterial; actions: ReturnType<typeof useMaterialActions> }) {
-    const Icon = material.type === 'video' ? VideoIcon : PresentationIcon;
-    const viewUrl = material.type === 'video' ? material.url : (material.pdf_url ?? material.url);
+    const Icon = material.type === 'video' ? VideoIcon : material.type === 'link' ? LinkIcon : PresentationIcon;
+    const viewUrl = material.type === 'presentation' ? (material.pdf_url ?? material.url) : material.url;
 
     return (
         <div className="flex items-center gap-2 rounded-lg border bg-background p-2 pr-3">
@@ -172,8 +178,14 @@ function MaterialRow({ material, actions }: { material: AdminMaterial; actions: 
             <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{material.title}</p>
                 <p className="truncate text-xs text-muted-foreground">
-                    {material.original_name} · {formatBytes(material.size)}
-                    {material.duration_seconds !== null && ` · ${formatDuration(material.duration_seconds)}`}
+                    {material.type === 'link' ? (
+                        `${embedOf(material.url).label} · ${material.url}`
+                    ) : (
+                        <>
+                            {material.original_name} · {formatBytes(material.size)}
+                            {material.duration_seconds !== null && ` · ${formatDuration(material.duration_seconds)}`}
+                        </>
+                    )}
                 </p>
             </div>
             <StatusBadge material={material} />
@@ -198,7 +210,7 @@ function MaterialRow({ material, actions }: { material: AdminMaterial; actions: 
                     <AlertDialogContent>
                         <AlertDialogHeader>
                             <AlertDialogTitle>¿Eliminar «{material.title}»?</AlertDialogTitle>
-                            <AlertDialogDescription>El archivo se borra del servidor.</AlertDialogDescription>
+                            <AlertDialogDescription>{material.type === 'link' ? 'Se quita del curso.' : 'El archivo se borra del servidor.'}</AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -234,6 +246,90 @@ function StatusBadge({ material }: { material: AdminMaterial }) {
             <TooltipTrigger asChild>{badge}</TooltipTrigger>
             <TooltipContent className="max-w-xs">{material.conversion_error}</TooltipContent>
         </Tooltip>
+    );
+}
+
+/** A video or page hosted elsewhere. It is embedded as is, so the student only has to open it. */
+function AddLinkDialog({ courseId }: { courseId: number }) {
+    const add = useAddMaterialLink(courseId);
+    const [open, setOpen] = useState(false);
+    const [url, setUrl] = useState('');
+    const [title, setTitle] = useState('');
+    const errors = validationErrors(add.error);
+
+    function submit(event: FormEvent) {
+        event.preventDefault();
+        add.mutate(
+            { url: url.trim(), title: title.trim() },
+            {
+                onSuccess: () => {
+                    toast.success(`«${title.trim()}» agregado`);
+                    setOpen(false);
+                },
+                onError: (error) => {
+                    if (Object.keys(validationErrors(error)).length === 0) {
+                        toast.error(errorMessage(error));
+                    }
+                },
+            },
+        );
+    }
+
+    return (
+        <Dialog
+            open={open}
+            onOpenChange={(next) => {
+                setOpen(next);
+                setUrl('');
+                setTitle('');
+                add.reset();
+            }}
+        >
+            <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                    <LinkIcon />
+                    Agregar enlace
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <form onSubmit={submit}>
+                    <DialogHeader>
+                        <DialogTitle>Agregar enlace</DialogTitle>
+                        <DialogDescription>
+                            Se muestra dentro del curso con el reproductor de YouTube, Vimeo o Drive. A diferencia de los videos subidos, se marca como visto al abrirlo. Si la red del alumno
+                            bloquea esa página, no lo va a poder ver.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <FieldGroup className="py-4">
+                        <Field data-invalid={!!errors.url}>
+                            <FieldLabel htmlFor="link-url">Enlace</FieldLabel>
+                            <Input
+                                id="link-url"
+                                type="url"
+                                value={url}
+                                onChange={(e) => setUrl(e.target.value)}
+                                placeholder="https://www.youtube.com/watch?v=…"
+                                maxLength={2048}
+                                required
+                                autoFocus
+                            />
+                            {errors.url && <FieldError>{errors.url[0]}</FieldError>}
+                        </Field>
+                        <Field data-invalid={!!errors.title}>
+                            <FieldLabel htmlFor="link-title">Título</FieldLabel>
+                            <Input id="link-title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={255} required />
+                            {errors.title && <FieldError>{errors.title[0]}</FieldError>}
+                        </Field>
+                    </FieldGroup>
+                    <DialogFooter>
+                        <Button type="submit" disabled={add.isPending}>
+                            {add.isPending && <Spinner />}
+                            Agregar
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
     );
 }
 

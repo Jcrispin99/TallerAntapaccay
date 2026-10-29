@@ -54,12 +54,14 @@ it('rejects a DNI that is not on the list', function (): void {
         ->assertJsonValidationErrors('dni');
 });
 
-it('counts the videos of each course in the catalog', function (): void {
+it('counts the videos and links of each course in the catalog', function (): void {
     $course = Course::factory()->create(['is_published' => true]);
     Material::factory()->for($course)->count(2)->create();
     Material::factory()->for($course)->presentation()->create();
+    Material::factory()->for($course)->link()->create();
 
     $this->getJson('/api/v1/courses')
-        ->assertJsonPath('data.0.materials_count', 3)
-        ->assertJsonPath('data.0.videos_count', 2);
+        ->assertJsonPath('data.0.materials_count', 4)
+        ->assertJsonPath('data.0.videos_count', 2)
+        ->assertJsonPath('data.0.links_count', 1);
 });

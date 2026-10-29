@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Storage;
  * @property string $title
  * @property string $original_name
  * @property string $path
+ * @property string|null $external_url
  * @property string|null $mime
  * @property int $size
  * @property int|null $duration_seconds
@@ -40,6 +41,7 @@ use Illuminate\Support\Facades\Storage;
     'title',
     'original_name',
     'path',
+    'external_url',
     'mime',
     'size',
     'duration_seconds',
@@ -71,7 +73,7 @@ final class Material extends Model
 
     public function url(): string
     {
-        return Storage::disk('public')->url($this->path);
+        return $this->external_url ?? Storage::disk('public')->url($this->path);
     }
 
     public function pdfUrl(): ?string

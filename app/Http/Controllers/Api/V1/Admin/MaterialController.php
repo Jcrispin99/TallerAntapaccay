@@ -8,6 +8,7 @@ use App\Enums\ConversionStatus;
 use App\Enums\MaterialType;
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Api\V1\Admin\ReorderMaterialsRequest;
+use App\Http\Requests\Api\V1\Admin\StoreMaterialLinkRequest;
 use App\Http\Requests\Api\V1\Admin\StoreMaterialRequest;
 use App\Http\Requests\Api\V1\Admin\UpdateMaterialRequest;
 use App\Http\Resources\Admin\MaterialResource;
@@ -49,6 +50,24 @@ final class MaterialController extends ApiController
         }
 
         return $this->created(new MaterialResource($material->refresh()), 'Material subido');
+    }
+
+    public function storeLink(StoreMaterialLinkRequest $request, Course $course): JsonResponse
+    {
+        Gate::authorize('manage', $course);
+
+        $material = $course->materials()->create([
+            'type' => MaterialType::Link,
+            'title' => $request->title,
+            'original_name' => $request->url,
+            'path' => '',
+            'external_url' => $request->url,
+            'size' => 0,
+            'conversion_status' => ConversionStatus::Ready,
+            'position' => $course->materials()->count(),
+        ]);
+
+        return $this->created(new MaterialResource($material->refresh()), 'Enlace agregado');
     }
 
     public function update(UpdateMaterialRequest $request, Material $material): JsonResponse

@@ -63,6 +63,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'throttle:admin'])->name('ap
     Route::apiResource('courses', Admin\CourseController::class);
 
     Route::post('courses/{course}/materials', [MaterialController::class, 'store'])->name('materials.store');
+    Route::post('courses/{course}/materials/link', [MaterialController::class, 'storeLink'])->name('materials.link');
     Route::patch('courses/{course}/materials/order', [MaterialController::class, 'reorder'])->name('materials.reorder');
     Route::patch('materials/{material}', [MaterialController::class, 'update'])->name('materials.update');
     Route::delete('materials/{material}', [MaterialController::class, 'destroy'])->name('materials.destroy');

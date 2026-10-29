@@ -45,4 +45,16 @@ final class MaterialFactory extends Factory
             'conversion_status' => $status,
         ]);
     }
+
+    public function link(string $url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'type' => MaterialType::Link,
+            'original_name' => $url,
+            'path' => '',
+            'external_url' => $url,
+            'mime' => null,
+            'size' => 0,
+        ]);
+    }
 }

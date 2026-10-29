@@ -65,6 +65,31 @@ it('serves an uploaded PDF without converting it', function (): void {
     Queue::assertNothingPushed();
 });
 
+it('adds a link as material', function (): void {
+    $course = Course::factory()->create();
+
+    $this->postJson("/api/v1/admin/courses/{$course->id}/materials/link", [
+        'url' => 'https://youtu.be/dQw4w9WgXcQ',
+        'title' => 'Uso de EPP',
+    ])
+        ->assertCreated()
+        ->assertJsonPath('data.type', 'link')
+        ->assertJsonPath('data.title', 'Uso de EPP')
+        ->assertJsonPath('data.url', 'https://youtu.be/dQw4w9WgXcQ')
+        ->assertJsonPath('data.conversion_status', 'ready');
+
+    // Nothing is stored, so deleting it leaves the disk alone.
+    Material::query()->sole()->delete();
+    Queue::assertNothingPushed();
+});
+
+it('only accepts https links', function (string $url): void {
+    $course = Course::factory()->create();
+
+    $this->postJson("/api/v1/admin/courses/{$course->id}/materials/link", ['url' => $url, 'title' => 'Video'])
+        ->assertJsonValidationErrors('url');
+})->with(['http://example.com/video.mp4', 'javascript:alert(1)', 'no es un enlace']);
+
 it('rejects unsupported files and files over the limit', function (): void {
     $course = Course::factory()->create();
     config(['platform.max_presentation_mb' => 1]);

@@ -10,6 +10,7 @@ import { useLearner } from '@/components/public/LearnerContext';
 import { MaterialViewer, type Tracking } from '@/components/public/MaterialViewer';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { embedOf } from '@/lib/embed';
 import { formatDuration, formatScore } from '@/lib/format';
 import { readSession, writeSession } from '@/lib/session';
 import { courseContents, standingOf } from '@/lib/standing';
@@ -121,6 +122,14 @@ function CourseContent({ course, progress, dni, tracking }: CourseContentProps) 
     const selected = materials.find((m) => m.id === selectedId) ?? materials.find((m) => !progress?.get(m.id)?.completed) ?? materials[0];
     const missing = progress ? materials.filter((m) => !progress.get(m.id)?.completed) : [];
 
+    // A finished video moves on to the next material, but presentations and links are completed
+    // as soon as they are shown: keep them on screen, or the page would run through all of them.
+    useEffect(() => {
+        if (selectedId === null && selected && selected.type !== 'video') {
+            setSelectedId(selected.id);
+        }
+    }, [selectedId, selected]);
+
     const scrollToStage = useRef(false);
 
     function toggleCinema() {
@@ -191,7 +200,7 @@ function CourseContent({ course, progress, dni, tracking }: CourseContentProps) 
                     <div
                         className={cn(
                             cinema && 'mx-auto',
-                            cinema && (selected.type === 'video' ? 'max-w-[calc((100svh_-_7rem)*16/9)]' : 'max-w-[calc((100svh_-_1rem)*4/3)]'),
+                            cinema && (selected.type === 'presentation' ? 'max-w-[calc((100svh_-_1rem)*4/3)]' : 'max-w-[calc((100svh_-_7rem)*16/9)]'),
                         )}
                     >
                         {player}
@@ -215,7 +224,7 @@ function MaterialStatus({ material, progress }: { material: Material; progress?:
     }
 
     if (material.type !== 'video') {
-        return <p className="text-sm text-muted-foreground">Ábrela para marcarla como vista.</p>;
+        return <p className="text-sm text-muted-foreground">{material.type === 'link' ? 'Ábrelo para marcarlo como visto.' : 'Ábrela para marcarla como vista.'}</p>;
     }
 
     return (
@@ -248,13 +257,20 @@ function MaterialList({
                 {materials.map((material) => {
                     const view = progress?.get(material.id);
                     const current = material.id === selectedId;
-                    const kind = material.type === 'video' ? `Video${material.duration_seconds ? ` ${formatDuration(material.duration_seconds)}` : ''}` : 'Presentación';
+                    const kind =
+                        material.type === 'video'
+                            ? `Video${material.duration_seconds ? ` ${formatDuration(material.duration_seconds)}` : ''}`
+                            : material.type === 'link'
+                              ? embedOf(material.url).label
+                              : 'Presentación';
                     const detail = view?.completed
                         ? `${kind} · completado`
                         : current && progress
                           ? material.type === 'video'
                               ? `Viendo ahora${material.duration_seconds ? ` · faltan ${formatDuration(material.duration_seconds - (view?.seconds_watched ?? 0))}` : ''}`
-                              : 'Abierta ahora'
+                              : material.type === 'link'
+                                ? 'Abierto ahora'
+                                : 'Abierta ahora'
                           : `${kind}${progress ? ' · pendiente' : ''}`;
 
                     return (

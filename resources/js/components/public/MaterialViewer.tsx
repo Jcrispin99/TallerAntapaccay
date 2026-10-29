@@ -1,16 +1,18 @@
-import { DownloadIcon, FileWarningIcon, InfoIcon, PlayIcon, Volume2Icon, VolumeXIcon } from 'lucide-react';
+import { DownloadIcon, ExternalLinkIcon, FileWarningIcon, InfoIcon, PlayIcon, Volume2Icon, VolumeXIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import type { Material } from '@/api/types';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { embedOf } from '@/lib/embed';
 import { formatDuration } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 /** Progress of the identified student. Without it the material is shown freely. */
 export interface Tracking {
     secondsWatched: number;
     completed: boolean;
-    /** Videos send the furthest second reached and their duration; presentations just report they were opened. */
+    /** Videos send the furthest second reached and their duration; presentations and links just report they were opened. */
     onReport: (seconds?: number, duration?: number | null) => void;
 }
 
@@ -23,6 +25,10 @@ const CONFIRM_END_EVERY_MS = 4000;
  * `data-stage-fill` marks what grows to fill the screen.
  */
 export function MaterialViewer({ material, tracking }: { material: Material; tracking?: Tracking }) {
+    if (material.type === 'link') {
+        return <LinkViewer key={material.id} material={material} tracking={tracking} />;
+    }
+
     if (material.type !== 'video') {
         return <PresentationViewer material={material} tracking={tracking} />;
     }
@@ -250,6 +256,52 @@ function PresentationViewer({ material, tracking }: { material: Material; tracki
             <Spinner className="size-6" />
             <p>Estamos preparando la presentación, aparecerá en unos segundos…</p>
         </Placeholder>
+    );
+}
+
+/**
+ * A video or page hosted elsewhere, embedded as is: its own player and
+ * controls, so it counts as seen once opened, like a presentation.
+ */
+function LinkViewer({ material, tracking }: { material: Material; tracking?: Tracking }) {
+    const embed = embedOf(material.url);
+    const pending = tracking !== undefined && !tracking.completed;
+    const onReport = useRef(tracking?.onReport);
+    onReport.current = tracking?.onReport;
+
+    useEffect(() => {
+        if (pending) {
+            onReport.current?.();
+        }
+    }, [pending]);
+
+    return (
+        <div className="flex flex-col bg-black">
+            {embed.kind === 'video' ? (
+                <video src={embed.src} controls preload="metadata" playsInline data-stage-fill className="aspect-video w-full bg-black">
+                    Tu navegador no puede reproducir este video.
+                </video>
+            ) : (
+                <iframe
+                    src={embed.src}
+                    title={material.title}
+                    allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                    allowFullScreen
+                    // YouTube refuses to play embeds that don't say which site they are on.
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    data-stage-fill
+                    className={cn('aspect-video w-full', embed.kind === 'page' ? 'bg-white' : 'bg-black')}
+                />
+            )}
+            <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 bg-card px-4 py-2.5 text-sm text-card-foreground/85">
+                <InfoIcon className="size-4 shrink-0 text-primary" />
+                <span className="min-w-0 flex-1">¿No se ve? Puede que la red de tu empresa bloquee {embed.provider}.</span>
+                <a href={material.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 font-semibold text-primary underline-offset-4 hover:underline">
+                    Abrir en otra pestaña
+                    <ExternalLinkIcon className="size-3.5" />
+                </a>
+            </p>
+        </div>
     );
 }
 

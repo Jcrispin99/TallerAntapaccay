@@ -97,6 +97,14 @@ it('marks a presentation as seen when opened', function (): void {
         ->assertJsonPath('data.completed', true);
 });
 
+it('marks a link as seen when opened', function (): void {
+    $link = Material::factory()->for($this->course)->link()->create();
+
+    $this->postJson("/api/v1/materials/{$link->id}/progress", ['dni' => '12345678'])
+        ->assertOk()
+        ->assertJsonPath('data.completed', true);
+});
+
 it('opens the evaluation only after every material is completed', function (): void {
     $evaluation = Evaluation::factory()->for($this->course)->create(['is_published' => true]);
     QuestionOption::factory()->for(Question::factory()->for($evaluation))->correct()->create();

@@ -113,6 +113,15 @@ export function useUploadMaterial(courseId: number) {
     });
 }
 
+export function useAddMaterialLink(courseId: number) {
+    const invalidate = useInvalidateCourse(courseId);
+
+    return useMutation({
+        mutationFn: (input: { url: string; title: string }) => unwrap(api.post<ApiEnvelope<AdminMaterial>>(`/admin/courses/${courseId}/materials/link`, input)),
+        onSuccess: invalidate,
+    });
+}
+
 export function useMaterialActions(courseId: number) {
     const invalidate = useInvalidateCourse(courseId);
 

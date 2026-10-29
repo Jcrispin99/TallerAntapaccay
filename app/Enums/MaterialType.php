@@ -8,6 +8,8 @@ enum MaterialType: string
 {
     case Video = 'video';
     case Presentation = 'presentation';
+    /** A video or page hosted elsewhere (YouTube, Vimeo, Drive…), shown embedded. */
+    case Link = 'link';
 
     /**
      * @return list<string>
@@ -17,6 +19,7 @@ enum MaterialType: string
         return match ($type) {
             self::Video => ['mp4', 'webm', 'm4v', 'mov'],
             self::Presentation => ['ppt', 'pptx', 'odp', 'pdf'],
+            self::Link => [],
         };
     }
 

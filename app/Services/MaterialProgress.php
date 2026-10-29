@@ -38,7 +38,7 @@ final class MaterialProgress
             return $view;
         }
 
-        // Presentations count as seen once opened.
+        // Presentations and links count as seen once opened.
         if ($material->type !== MaterialType::Video) {
             $view->update(['completed_at' => now()]);
 
