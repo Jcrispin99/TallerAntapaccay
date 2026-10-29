@@ -16,12 +16,12 @@ Stack: Laravel 13 (API en `/api/v1`) + React 19 con [shadcn/ui](https://ui.shadc
   brew install --cask libreoffice
   ```
   Sin LibreOffice, las presentaciones quedan con estado "Error" y el alumno solo puede descargarlas. Los PDF y los videos no lo necesitan.
-- **FFmpeg**, para que los videos empiecen a reproducirse mientras cargan (ver *Videos que tardan en empezar*):
+- **FFmpeg** (incluye `ffprobe`), para que los videos sean livianos y empiecen a reproducirse mientras cargan (ver *Videos livianos y que empiezan rápido*):
   ```bash
   brew install ffmpeg         # macOS
   sudo apt install ffmpeg     # Ubuntu
   ```
-  Sin FFmpeg los videos se ven igual, pero los que tienen el índice al final tardan en empezar.
+  Sin FFmpeg los videos se ven igual, pero los pesados o con el índice al final tardan en empezar.
 - **Límites de subida**: el panel sube los archivos en partes de 20 MB (ver *Subida por partes*), así que PHP (`upload_max_filesize`, `post_max_size`) y nginx (`client_max_body_size`) solo necesitan aceptar unos 25 MB por envío. El tamaño máximo de cada archivo lo fijan `MAX_VIDEO_MB` y `MAX_PRESENTATION_MB`. Quien use la API directamente con el campo `file` necesita que PHP y nginx acepten el archivo completo.
 
 ## Instalación
@@ -46,7 +46,8 @@ php artisan app:create-admin tu@correo.com --name="Tu nombre"   # pide la contra
 |---|---|
 | `LIBREOFFICE_PATH` | Ruta al binario `soffice` |
 | `LIBREOFFICE_TIMEOUT` | Segundos máximos por conversión |
-| `FFMPEG_PATH` | Ruta al binario `ffmpeg` (por defecto, el que esté en el PATH) |
+| `FFMPEG_PATH` / `FFPROBE_PATH` | Rutas a `ffmpeg` y `ffprobe` (por defecto, los que estén en el PATH) |
+| `DB_QUEUE_RETRY_AFTER` | Segundos antes de dar por perdido un job de la cola: debe superar la hora que puede tomar comprimir un video largo (por ejemplo 3700) |
 | `MAX_VIDEO_MB` / `MAX_PRESENTATION_MB` | Tamaño máximo por archivo |
 | `APP_TIMEZONE` | Zona horaria de las fechas (por ejemplo `America/Lima`) |
 
@@ -105,11 +106,14 @@ Cloudflare corta cualquier envío de más de 100 MB, así que el panel no manda 
 
 Las partes se guardan en `storage/app/private/uploads`. Las subidas que quedan sin terminar se borran al día siguiente, cuando alguien empieza otra. Igual conviene grabar en 720p: cada alumno descarga el video completo.
 
-## Videos que tardan en empezar
+## Videos livianos y que empiezan rápido
 
-Un MP4 tiene un índice (la caja `moov`) que dice dónde está cada segundo. Muchos grabadores de pantalla y editores lo dejan al final del archivo, y entonces el navegador no puede empezar hasta llegar a él: en un video grande, uno o dos minutos de pantalla negra. Al subir un video, el job `OptimizeVideoForStreaming` lo mueve al principio con FFmpeg (`-movflags +faststart`), sin recomprimir: tarda segundos y no cambia la calidad. El archivo queda con un nombre nuevo, porque Cloudflare guarda en caché el anterior.
+Al subir un video, el job `OptimizeVideoForStreaming` lo prepara con FFmpeg, con la prioridad más baja para no frenar la web:
 
-Para los videos subidos antes, o después de instalar FFmpeg:
+- **Si es pesado** (más de 720p o de 2,5 Mbps) o no es H.264 (los HEVC de iPhone o los WebM no se ven en todos los navegadores), lo vuelve a codificar como MP4 H.264 de 720p a unos 2 Mbps como máximo. Las grabaciones de pantalla y diapositivas quedan de 10 a 20 veces más livianas y se ven igual de nítidas. En un servidor de un núcleo tarda más o menos la cuarta parte de lo que dura el video.
+- **Si ya es liviano**, solo mueve su índice (la caja `moov`) al principio, sin recomprimir. Muchos grabadores lo dejan al final, y entonces el navegador no puede empezar hasta llegar a él: en un video grande, uno o dos minutos de pantalla negra.
+
+Mientras se prepara, el alumno ve el original. El resultado queda con un nombre nuevo, porque Cloudflare guarda en caché el anterior. Para los videos subidos antes, o después de instalar FFmpeg:
 
 ```bash
 php artisan app:optimize-videos
@@ -135,7 +139,7 @@ app/
   Policies/CoursePolicy.php       cada profesor gestiona solo sus cursos; el admin, todos
   Console/Commands/CreateAdmin.php
   Jobs/ConvertPresentationToPdf.php
-  Jobs/OptimizeVideoForStreaming.php  pone el índice de los videos al principio
+  Jobs/OptimizeVideoForStreaming.php  aligera los videos y pone su índice al principio
   Services/EvaluationGrader.php    corrección y recálculo de notas
   Services/EvaluationFormSync.php  guarda el formulario completo del editor
   Services/StudentImporter.php     importa la lista de alumnos desde Excel/CSV

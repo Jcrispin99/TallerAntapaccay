@@ -23,12 +23,15 @@ return [
     | FFmpeg
     |--------------------------------------------------------------------------
     |
-    | Moves the index of uploaded videos to the start of the file, so they
-    | begin playing while they load. Videos are not re-encoded.
+    | Makes uploaded videos start quickly: heavy ones are encoded again as a
+    | light 720p MP4, and the index of the rest is moved to the start of the
+    | file (see OptimizeVideoForStreaming).
     |
     */
 
     'ffmpeg_path' => env('FFMPEG_PATH', 'ffmpeg'),
+
+    'ffprobe_path' => env('FFPROBE_PATH', 'ffprobe'),
 
     /*
     |--------------------------------------------------------------------------

@@ -16,14 +16,20 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
- * A video whose index (the "moov" box) sits after its data cannot start until
- * the browser reaches the index, which in a large file means minutes of black
- * screen. FFmpeg moves the index to the start ("faststart") without
- * re-encoding, in seconds. The result gets a new name, because Cloudflare
- * keeps serving what it cached under the old one.
+ * Makes an uploaded video start quickly and play without pauses:
+ *
+ * - A heavy video (over 720p or 2.5 Mbps) or one not every browser plays
+ *   (HEVC from iPhones, WebM…) is encoded again as a light H.264 720p MP4.
+ *   Screen recordings and slides end up 10 to 20 times lighter.
+ * - A light one only gets its index (the "moov" box) moved to the start, in
+ *   seconds and without re-encoding. With the index at the end, the browser
+ *   cannot start until it reaches it: minutes of black screen in a large file.
+ *
+ * FFmpeg runs at the lowest priority, so pages keep loading while it works.
+ * The result gets a new name, because Cloudflare keeps serving what it cached.
  */
 #[Tries(1)]
-#[Timeout(600)]
+#[Timeout(3600)]
 #[DeleteWhenMissingModels]
 final class OptimizeVideoForStreaming implements ShouldQueue
 {
@@ -32,42 +38,106 @@ final class OptimizeVideoForStreaming implements ShouldQueue
     /** Formats that store their index in boxes (MP4 and QuickTime). */
     private const array EXTENSIONS = ['mp4', 'm4v', 'mov'];
 
+    private const int MAX_HEIGHT = 720;
+
+    private const int MAX_BITRATE = 2_500_000;
+
     public function __construct(public Material $material) {}
 
     public function handle(): void
     {
-        $disk = Storage::disk('public');
-        $extension = mb_strtolower(pathinfo($this->material->path, PATHINFO_EXTENSION));
+        $source = Storage::disk('public')->path($this->material->path);
+        $video = $this->probe($source);
 
-        if (! in_array($extension, self::EXTENSIONS, true) || ! $this->indexIsAtTheEnd($disk->path($this->material->path))) {
+        if ($video !== null && ($video['codec'] !== 'h264' || $video['height'] > self::MAX_HEIGHT || $video['bitrate'] > self::MAX_BITRATE)) {
+            $this->replaceWith('mp4', 'video/mp4', [
+                '-map', '0:v:0', '-map', '0:a:0?',
+                // 720p at most, never enlarged, with the even size H.264 requires.
+                '-vf', "scale=-2:'min(720,trunc(ih/2)*2)'",
+                '-pix_fmt', 'yuv420p',
+                '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '25',
+                // Caps the peaks, so it plays steadily on connections of about 2 Mbps.
+                '-maxrate', '2000k', '-bufsize', '4000k',
+                '-c:a', 'aac', '-b:a', '128k',
+                '-movflags', '+faststart',
+            ]);
+
             return;
         }
 
+        $extension = mb_strtolower(pathinfo($this->material->path, PATHINFO_EXTENSION));
+
+        if (in_array($extension, self::EXTENSIONS, true) && $this->indexIsAtTheEnd($source)) {
+            $this->replaceWith($extension, $this->material->mime, [
+                // Video and audio only: some phones add data tracks that MP4 cannot hold.
+                '-map', '0:v', '-map', '0:a?',
+                '-c', 'copy',
+                '-movflags', '+faststart',
+            ]);
+        }
+    }
+
+    /**
+     * @param  list<string>  $arguments  FFmpeg options between the input and the output.
+     */
+    private function replaceWith(string $extension, ?string $mime, array $arguments): void
+    {
+        $disk = Storage::disk('public');
         $path = dirname($this->material->path).'/'.Str::uuid().'.'.$extension;
 
         // A bit under the job's timeout, so a stuck FFmpeg is stopped and logged.
-        $result = Process::timeout(570)->run([
+        $result = Process::timeout(3570)->run([
+            'nice', '-n', '19',
             config()->string('platform.ffmpeg_path'),
             '-v', 'error',
             '-i', $disk->path($this->material->path),
-            // Video and audio only: some phones add data tracks that MP4 cannot hold.
-            '-map', '0:v', '-map', '0:a?',
-            '-c', 'copy',
-            '-movflags', '+faststart',
+            ...$arguments,
             $disk->path($path),
         ]);
 
         if ($result->failed() || ! $disk->exists($path)) {
             $disk->delete($path);
-            // The video still plays, it only takes longer to start.
+            // The original still plays, only slower to start.
             Log::warning("No se pudo optimizar el video {$this->material->id}: ".mb_trim($result->errorOutput()));
 
             return;
         }
 
         $previous = $this->material->path;
-        $this->material->update(['path' => $path, 'size' => $disk->size($path)]);
+        $this->material->update(['path' => $path, 'size' => $disk->size($path), 'mime' => $mime]);
         $disk->delete($previous);
+    }
+
+    /**
+     * The first video stream and the overall bitrate, or null when FFprobe is missing or cannot read the file.
+     *
+     * @return array{codec: string, height: int, bitrate: int}|null
+     */
+    private function probe(string $file): ?array
+    {
+        $result = Process::timeout(60)->run([
+            config()->string('platform.ffprobe_path'),
+            '-v', 'error',
+            '-print_format', 'json',
+            '-select_streams', 'v:0',
+            '-show_entries', 'stream=codec_name,height:format=bit_rate',
+            $file,
+        ]);
+
+        $data = json_decode($result->output(), true);
+        $codec = data_get($data, 'streams.0.codec_name');
+        $height = data_get($data, 'streams.0.height');
+        $bitrate = data_get($data, 'format.bit_rate');
+
+        if ($result->failed() || ! is_string($codec)) {
+            return null;
+        }
+
+        return [
+            'codec' => $codec,
+            'height' => is_int($height) ? $height : 0,
+            'bitrate' => is_numeric($bitrate) ? (int) $bitrate : 0,
+        ];
     }
 
     /**
