@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Admin;
 use App\Http\Controllers\Api\V1\Admin\AnswerController;
 use App\Http\Controllers\Api\V1\Admin\MaterialController;
 use App\Http\Controllers\Api\V1\Admin\StudentController;
+use App\Http\Controllers\Api\V1\Admin\UploadController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
 use App\Http\Controllers\Api\V1\AttemptController;
 use App\Http\Controllers\Api\V1\AuthController;
@@ -62,6 +63,9 @@ Route::prefix('auth')->name('api.v1.auth.')->group(function (): void {
 Route::prefix('admin')->middleware(['auth:sanctum', 'throttle:admin'])->name('api.v1.admin.')->group(function (): void {
     Route::apiResource('courses', Admin\CourseController::class);
 
+    // Large files arrive in chunks, then their upload id goes to materials.store
+    Route::post('courses/{course}/uploads', [UploadController::class, 'store'])->name('uploads.store');
+    Route::post('uploads/{upload}/chunks', [UploadController::class, 'chunk'])->whereUuid('upload')->name('uploads.chunk');
     Route::post('courses/{course}/materials', [MaterialController::class, 'store'])->name('materials.store');
     Route::post('courses/{course}/materials/link', [MaterialController::class, 'storeLink'])->name('materials.link');
     Route::patch('courses/{course}/materials/order', [MaterialController::class, 'reorder'])->name('materials.reorder');

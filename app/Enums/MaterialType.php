@@ -35,4 +35,10 @@ enum MaterialType: string
 
         return null;
     }
+
+    /** Largest file accepted for this type, in MB (config/platform.php). */
+    public function maxUploadMb(): int
+    {
+        return $this === self::Video ? config()->integer('platform.max_video_mb') : config()->integer('platform.max_presentation_mb');
+    }
 }

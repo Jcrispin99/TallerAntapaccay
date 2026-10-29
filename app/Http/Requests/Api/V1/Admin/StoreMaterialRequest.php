@@ -5,16 +5,24 @@ declare(strict_types=1);
 namespace App\Http\Requests\Api\V1\Admin;
 
 use App\Enums\MaterialType;
+use App\Models\Course;
+use App\Models\User;
+use App\Services\ChunkedUploads;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Validator;
 
 /**
+ * The file comes in the request, or was sent before in chunks and comes as
+ * the id of that upload (see UploadController).
+ *
  * @property string|null $title
  */
 final class StoreMaterialRequest extends FormRequest
 {
+    private ?UploadedFile $completedUpload = null;
+
     public function authorize(): bool
     {
         return true;
@@ -31,7 +39,8 @@ final class StoreMaterialRequest extends FormRequest
         ];
 
         return [
-            'file' => ['required', 'file', 'extensions:'.implode(',', $extensions)],
+            'file' => ['required_without:upload', 'file', 'extensions:'.implode(',', $extensions)],
+            'upload' => ['required_without:file', 'prohibits:file', 'string'],
             'title' => ['nullable', 'string', 'max:255'],
             // Seconds, read by the browser before uploading a video.
             'duration' => ['nullable', 'integer', 'min:1', 'max:86400'],
@@ -44,7 +53,7 @@ final class StoreMaterialRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'file.required' => 'Selecciona un archivo.',
+            'file.required_without' => 'Selecciona un archivo.',
             'file.uploaded' => 'El archivo no se pudo subir. Revisa upload_max_filesize y post_max_size de PHP.',
             'file.extensions' => 'Formato no soportado. Usa un video (mp4, webm, m4v, mov) o una presentación (ppt, pptx, odp, pdf).',
         ];
@@ -57,18 +66,26 @@ final class StoreMaterialRequest extends FormRequest
     {
         return [
             function (Validator $validator): void {
-                $file = $this->file('file');
-
-                if ($validator->errors()->isNotEmpty() || ! $file instanceof UploadedFile) {
+                if ($validator->errors()->isNotEmpty()) {
                     return;
                 }
 
-                $type = $this->materialType();
-                $maxMb = $type === MaterialType::Video
-                    ? config()->integer('platform.max_video_mb')
-                    : config()->integer('platform.max_presentation_mb');
+                if ($this->uploadId() !== null) {
+                    $course = $this->route('course');
+                    $user = $this->user();
+                    assert($course instanceof Course && $user instanceof User);
+                    $this->completedUpload = resolve(ChunkedUploads::class)->completed($this->uploadId(), $user, $course);
 
-                if ($file->getSize() > $maxMb * 1024 * 1024) {
+                    if (! $this->completedUpload instanceof UploadedFile) {
+                        $validator->errors()->add('upload', 'La subida no terminó o ya expiró. Vuelve a subir el archivo.');
+
+                        return;
+                    }
+                }
+
+                $maxMb = $this->materialType()->maxUploadMb();
+
+                if ($this->uploadedFile()->getSize() > $maxMb * 1024 * 1024) {
                     $validator->errors()->add('file', "El archivo supera el máximo de {$maxMb} MB.");
                 }
             },
@@ -77,10 +94,15 @@ final class StoreMaterialRequest extends FormRequest
 
     public function uploadedFile(): UploadedFile
     {
-        $file = $this->file('file');
+        $file = $this->completedUpload ?? $this->file('file');
         assert($file instanceof UploadedFile);
 
         return $file;
+    }
+
+    public function uploadId(): ?string
+    {
+        return $this->filled('upload') ? $this->string('upload')->toString() : null;
     }
 
     public function materialType(): MaterialType

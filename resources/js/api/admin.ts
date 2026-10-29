@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AxiosError } from 'axios';
 
 import { api, unwrap } from './client';
 import type {
@@ -91,26 +92,74 @@ export function useDeleteCourse() {
     });
 }
 
+interface StartedUpload {
+    id: string;
+    chunk_size: number;
+}
+
+/**
+ * Files go in chunks, because Cloudflare cuts any request over 100 MB (see ChunkedUploads).
+ * The server answers each chunk with the bytes it has, and the next chunk starts there.
+ */
 export function useUploadMaterial(courseId: number) {
     const invalidate = useInvalidateCourse(courseId);
 
     return useMutation({
-        mutationFn: ({ file, duration, onProgress }: { file: File; duration: number | null; onProgress: (percent: number) => void }) => {
-            const form = new FormData();
-            form.append('file', file);
+        mutationFn: async ({ file, duration, onProgress }: { file: File; duration: number | null; onProgress: (percent: number) => void }) => {
+            const upload = await unwrap(
+                api.post<ApiEnvelope<StartedUpload>>(`/admin/courses/${courseId}/uploads`, { name: file.name, size: file.size, mime: file.type || null }),
+            );
+            // 100% means "Procesando…", while the server stores the file.
+            const report = (bytes: number) => onProgress(Math.min(99, Math.round((bytes / file.size) * 100)));
+            let offset = 0;
 
-            if (duration !== null) {
-                form.append('duration', String(duration));
+            while (offset < file.size) {
+                const start = offset;
+                const form = new FormData();
+                form.append('offset', String(start));
+                form.append('chunk', file.slice(start, start + upload.chunk_size), 'chunk');
+
+                const { received } = await withRetries(() =>
+                    unwrap(
+                        api.post<ApiEnvelope<{ received: number }>>(`/admin/uploads/${upload.id}/chunks`, form, {
+                            onUploadProgress: (event) => report(start + event.loaded),
+                        }),
+                    ),
+                );
+
+                if (received === start) {
+                    throw new Error('La subida no avanza.');
+                }
+
+                offset = received;
+                report(offset);
             }
 
-            return unwrap(
-                api.post<ApiEnvelope<AdminMaterial>>(`/admin/courses/${courseId}/materials`, form, {
-                    onUploadProgress: (event) => onProgress(event.total ? Math.round((event.loaded / event.total) * 100) : 0),
-                }),
-            );
+            onProgress(100);
+
+            return unwrap(api.post<ApiEnvelope<AdminMaterial>>(`/admin/courses/${courseId}/materials`, { upload: upload.id, duration }));
         },
         onSuccess: invalidate,
     });
+}
+
+/** Retries a request lost to the network or to a brief server or Cloudflare error, waiting longer each time. */
+async function withRetries<T>(request: () => Promise<T>, attempts = 4): Promise<T> {
+    for (let attempt = 1; ; attempt++) {
+        try {
+            return await request();
+        } catch (error) {
+            // 0 is no response at all (the network failed); 429 and 5xx, Cloudflare's 52x included, are usually brief.
+            const status = error instanceof AxiosError ? (error.response?.status ?? 0) : null;
+            const transient = status !== null && (status === 0 || status === 429 || status >= 500);
+
+            if (!transient || attempt === attempts) {
+                throw error;
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, 2000 * 2 ** (attempt - 1)));
+        }
+    }
 }
 
 export function useAddMaterialLink(courseId: number) {

@@ -16,7 +16,7 @@ Stack: Laravel 13 (API en `/api/v1`) + React 19 con [shadcn/ui](https://ui.shadc
   brew install --cask libreoffice
   ```
   Sin LibreOffice, las presentaciones quedan con estado "Error" y el alumno solo puede descargarlas. Los PDF y los videos no lo necesitan.
-- **Límites de subida**: las presentaciones pueden pesar 50 MB o más, y los videos aún más. PHP (`upload_max_filesize`, `post_max_size`) y nginx (`client_max_body_size`) deben permitir al menos `MAX_VIDEO_MB`. En Herd se cambia en *Settings → PHP → Max file upload size* (aquí ya está en 1 GB). En un servidor, configura lo mismo en su `php.ini` y en nginx.
+- **Límites de subida**: el panel sube los archivos en partes de 20 MB (ver *Subida por partes*), así que PHP (`upload_max_filesize`, `post_max_size`) y nginx (`client_max_body_size`) solo necesitan aceptar unos 25 MB por envío. El tamaño máximo de cada archivo lo fijan `MAX_VIDEO_MB` y `MAX_PRESENTATION_MB`. Quien use la API directamente con el campo `file` necesita que PHP y nginx acepten el archivo completo.
 
 ## Instalación
 
@@ -86,7 +86,17 @@ npm run typecheck   # TypeScript
 - **Presentaciones:** cuentan como vistas al abrirlas (o al descargarlas, si no se pudieron convertir).
 - **Enlaces:** el profesor también puede agregar un video o una página con su enlace (*Agregar enlace*). YouTube, Vimeo y Google Drive se muestran con su propio reproductor, un enlace a un .mp4 con el reproductor normal, y cualquier otra página dentro del curso. Cuentan como vistos al abrirlos: con el reproductor de afuera no se puede exigir verlos completos. Si la red del alumno bloquea esa página (por ejemplo, YouTube en la red de una empresa), no lo va a poder ver; los videos subidos se sirven desde la plataforma y no tienen ese problema.
 - **Modo cine y pantalla completa:** sirven para videos y presentaciones. El modo cine ocupa todo el ancho de la ventana sin cortar el video; la pantalla completa mantiene los controles del video obligatorio.
-- La duración de cada video se lee en el navegador del profesor al subirlo. El subidor avisa antes de enviar si el archivo supera `MAX_VIDEO_MB`. En producción el límite es de 100 MB, porque Cloudflare corta las subidas más grandes: graba en 720p o comprime el video.
+- La duración de cada video se lee en el navegador del profesor al subirlo. El subidor avisa antes de enviar si el archivo supera `MAX_VIDEO_MB`.
+
+## Subida por partes
+
+Cloudflare corta cualquier envío de más de 100 MB, así que el panel no manda el archivo de una vez:
+
+1. `POST /admin/courses/{course}/uploads` con el nombre y el tamaño: se valida el formato y el máximo antes de enviar nada, y devuelve un id.
+2. `POST /admin/uploads/{id}/chunks` con cada parte de 20 MB y el byte donde empieza. El servidor la agrega al final y responde cuántos bytes tiene; la siguiente parte empieza ahí. Si una parte falla por la red o por un error momentáneo de Cloudflare, se reintenta, y una parte repetida no se agrega dos veces.
+3. `POST /admin/courses/{course}/materials` con `upload: id` en lugar de `file`, cuando llegó todo.
+
+Las partes se guardan en `storage/app/private/uploads`. Las subidas que quedan sin terminar se borran al día siguiente, cuando alguien empieza otra. Igual conviene grabar en 720p: cada alumno descarga el video completo.
 
 ## Cómo se califica
 
@@ -111,6 +121,7 @@ app/
   Services/EvaluationGrader.php    corrección y recálculo de notas
   Services/EvaluationFormSync.php  guarda el formulario completo del editor
   Services/StudentImporter.php     importa la lista de alumnos desde Excel/CSV
+  Services/ChunkedUploads.php      junta los archivos que llegan por partes
 resources/js/
   api/          cliente axios + hooks de TanStack Query
   pages/public  catálogo, curso, evaluación, resultado

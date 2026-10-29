@@ -15,13 +15,14 @@ use App\Http\Resources\Admin\MaterialResource;
 use App\Jobs\ConvertPresentationToPdf;
 use App\Models\Course;
 use App\Models\Material;
+use App\Services\ChunkedUploads;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
 final class MaterialController extends ApiController
 {
-    public function store(StoreMaterialRequest $request, Course $course): JsonResponse
+    public function store(StoreMaterialRequest $request, Course $course, ChunkedUploads $uploads): JsonResponse
     {
         Gate::authorize('manage', $course);
 
@@ -44,6 +45,11 @@ final class MaterialController extends ApiController
             'conversion_status' => $type === MaterialType::Video || $isPdf ? ConversionStatus::Ready : ConversionStatus::Pending,
             'position' => $course->materials()->count(),
         ]);
+
+        // The chunks were copied to the public disk.
+        if ($request->uploadId() !== null) {
+            $uploads->discard($request->uploadId());
+        }
 
         if ($material->conversion_status === ConversionStatus::Pending) {
             dispatch(new ConvertPresentationToPdf($material));
