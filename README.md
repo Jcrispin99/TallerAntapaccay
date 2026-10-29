@@ -16,6 +16,12 @@ Stack: Laravel 13 (API en `/api/v1`) + React 19 con [shadcn/ui](https://ui.shadc
   brew install --cask libreoffice
   ```
   Sin LibreOffice, las presentaciones quedan con estado "Error" y el alumno solo puede descargarlas. Los PDF y los videos no lo necesitan.
+- **FFmpeg**, para que los videos empiecen a reproducirse mientras cargan (ver *Videos que tardan en empezar*):
+  ```bash
+  brew install ffmpeg         # macOS
+  sudo apt install ffmpeg     # Ubuntu
+  ```
+  Sin FFmpeg los videos se ven igual, pero los que tienen el índice al final tardan en empezar.
 - **Límites de subida**: el panel sube los archivos en partes de 20 MB (ver *Subida por partes*), así que PHP (`upload_max_filesize`, `post_max_size`) y nginx (`client_max_body_size`) solo necesitan aceptar unos 25 MB por envío. El tamaño máximo de cada archivo lo fijan `MAX_VIDEO_MB` y `MAX_PRESENTATION_MB`. Quien use la API directamente con el campo `file` necesita que PHP y nginx acepten el archivo completo.
 
 ## Instalación
@@ -40,6 +46,7 @@ php artisan app:create-admin tu@correo.com --name="Tu nombre"   # pide la contra
 |---|---|
 | `LIBREOFFICE_PATH` | Ruta al binario `soffice` |
 | `LIBREOFFICE_TIMEOUT` | Segundos máximos por conversión |
+| `FFMPEG_PATH` | Ruta al binario `ffmpeg` (por defecto, el que esté en el PATH) |
 | `MAX_VIDEO_MB` / `MAX_PRESENTATION_MB` | Tamaño máximo por archivo |
 | `APP_TIMEZONE` | Zona horaria de las fechas (por ejemplo `America/Lima`) |
 
@@ -98,6 +105,16 @@ Cloudflare corta cualquier envío de más de 100 MB, así que el panel no manda 
 
 Las partes se guardan en `storage/app/private/uploads`. Las subidas que quedan sin terminar se borran al día siguiente, cuando alguien empieza otra. Igual conviene grabar en 720p: cada alumno descarga el video completo.
 
+## Videos que tardan en empezar
+
+Un MP4 tiene un índice (la caja `moov`) que dice dónde está cada segundo. Muchos grabadores de pantalla y editores lo dejan al final del archivo, y entonces el navegador no puede empezar hasta llegar a él: en un video grande, uno o dos minutos de pantalla negra. Al subir un video, el job `OptimizeVideoForStreaming` lo mueve al principio con FFmpeg (`-movflags +faststart`), sin recomprimir: tarda segundos y no cambia la calidad. El archivo queda con un nombre nuevo, porque Cloudflare guarda en caché el anterior.
+
+Para los videos subidos antes, o después de instalar FFmpeg:
+
+```bash
+php artisan app:optimize-videos
+```
+
 ## Cómo se califica
 
 - **Opción única / desplegable**: puntaje completo si elige la opción correcta.
@@ -118,6 +135,7 @@ app/
   Policies/CoursePolicy.php       cada profesor gestiona solo sus cursos; el admin, todos
   Console/Commands/CreateAdmin.php
   Jobs/ConvertPresentationToPdf.php
+  Jobs/OptimizeVideoForStreaming.php  pone el índice de los videos al principio
   Services/EvaluationGrader.php    corrección y recálculo de notas
   Services/EvaluationFormSync.php  guarda el formulario completo del editor
   Services/StudentImporter.php     importa la lista de alumnos desde Excel/CSV

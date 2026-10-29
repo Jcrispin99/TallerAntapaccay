@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\ConversionStatus;
 use App\Jobs\ConvertPresentationToPdf;
+use App\Jobs\OptimizeVideoForStreaming;
 use App\Models\Course;
 use App\Models\Material;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -34,7 +35,7 @@ it('uploads a video ready to play', function (): void {
 
     Storage::disk('public')->assertExists(Material::query()->sole()->path);
     expect($response->json('data.url'))->toContain("/storage/courses/{$course->id}/");
-    Queue::assertNothingPushed();
+    Queue::assertPushed(OptimizeVideoForStreaming::class);
 });
 
 it('queues the PDF conversion of a presentation', function (): void {

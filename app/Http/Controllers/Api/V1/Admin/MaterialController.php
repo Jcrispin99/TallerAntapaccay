@@ -13,6 +13,7 @@ use App\Http\Requests\Api\V1\Admin\StoreMaterialRequest;
 use App\Http\Requests\Api\V1\Admin\UpdateMaterialRequest;
 use App\Http\Resources\Admin\MaterialResource;
 use App\Jobs\ConvertPresentationToPdf;
+use App\Jobs\OptimizeVideoForStreaming;
 use App\Models\Course;
 use App\Models\Material;
 use App\Services\ChunkedUploads;
@@ -53,6 +54,11 @@ final class MaterialController extends ApiController
 
         if ($material->conversion_status === ConversionStatus::Pending) {
             dispatch(new ConvertPresentationToPdf($material));
+        }
+
+        // So that it starts playing while it loads.
+        if ($type === MaterialType::Video) {
+            dispatch(new OptimizeVideoForStreaming($material));
         }
 
         return $this->created(new MaterialResource($material->refresh()), 'Material subido');
