@@ -53,12 +53,21 @@ it('does not let a video advance faster than real time', function (): void {
     // A single report cannot jump to the end.
     reportProgress($this->video, 300)->assertOk()->assertJsonPath('data.seconds_watched', 15)->assertJsonPath('data.completed', false);
 
-    // After 60 seconds, at most twice that (2x speed) plus a margin.
+    // After 60 seconds, at most 60 more (normal speed) plus a small margin.
     $this->travel(60)->seconds();
-    reportProgress($this->video, 300)->assertJsonPath('data.seconds_watched', 150);
+    reportProgress($this->video, 300)->assertJsonPath('data.seconds_watched', 77);
 
     // Going back does not lose progress.
-    reportProgress($this->video, 40)->assertJsonPath('data.seconds_watched', 150);
+    reportProgress($this->video, 40)->assertJsonPath('data.seconds_watched', 77);
+});
+
+it('does not complete a short video before its last second', function (): void {
+    $this->video->update(['duration_seconds' => 5]);
+
+    reportProgress($this->video, 2)->assertJsonPath('data.completed', false);
+
+    $this->travel(3)->seconds();
+    reportProgress($this->video, 5)->assertJsonPath('data.completed', true);
 });
 
 it('completes a video watched to the end', function (): void {
@@ -74,7 +83,10 @@ it('completes a video watched to the end', function (): void {
 it('uses the duration seen by the player when the upload did not record one', function (): void {
     $this->video->update(['duration_seconds' => null]);
 
-    reportProgress($this->video, 8, duration: 10)->assertJsonPath('data.completed', true);
+    reportProgress($this->video, 8, duration: 10)->assertJsonPath('data.completed', false);
+
+    $this->travel(2)->seconds();
+    reportProgress($this->video, 10, duration: 10)->assertJsonPath('data.completed', true);
 });
 
 it('marks a presentation as seen when opened', function (): void {

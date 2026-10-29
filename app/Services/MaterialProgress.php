@@ -10,20 +10,21 @@ use App\Models\MaterialView;
 use App\Models\Student;
 
 /**
- * Records how far a student got in a material. The player already prevents
- * skipping ahead; here a video's position can only grow as fast as real time
- * allows, so a single request cannot mark it as watched.
+ * Records how far a student got in a material. Videos must be watched at
+ * normal speed: the player has no pause, seek or speed controls, and here a
+ * video's position can only grow as fast as real time passes, so the whole
+ * duration has to be spent on it.
  */
 final class MaterialProgress
 {
-    /** Fastest playback speed the player allows. */
-    private const float MAX_SPEED = 2.0;
+    /** The player reports every few seconds, so its first report may already be this far in. */
+    private const int FIRST_REPORT_SECONDS = 15;
 
-    /** Margin for network delays and the first report. */
-    private const int SLACK_SECONDS = 15;
+    /** Rounding of timestamps and network delays. */
+    private const int MARGIN_SECONDS = 2;
 
-    /** Players often stop a moment before the reported duration. */
-    private const int END_TOLERANCE_SECONDS = 5;
+    /** Durations are whole seconds, so the last second counts as the end. */
+    private const int END_TOLERANCE_SECONDS = 1;
 
     /**
      * @param  int  $position  Furthest second reached in the player (videos only).
@@ -44,8 +45,9 @@ final class MaterialProgress
             return $view;
         }
 
-        $elapsed = max(0, (int) $view->updated_at?->diffInSeconds(now()));
-        $reachable = $view->seconds_watched + (int) ceil($elapsed * self::MAX_SPEED) + self::SLACK_SECONDS;
+        $reachable = $view->wasRecentlyCreated
+            ? self::FIRST_REPORT_SECONDS
+            : $view->seconds_watched + max(0, (int) $view->updated_at?->diffInSeconds(now())) + self::MARGIN_SECONDS;
         $view->seconds_watched = max($view->seconds_watched, min($position, $reachable));
 
         $duration = $material->duration_seconds ?? $reportedDuration;

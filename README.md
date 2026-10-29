@@ -82,7 +82,7 @@ npm run typecheck   # TypeScript
 ## Material obligatorio antes de rendir
 
 - Si un curso tiene material y evaluación, el alumno ingresa su DNI al entrar al curso. Su avance en cada material queda registrado, y el botón *Rendir evaluación* se habilita cuando lo termina todo. El servidor también lo exige al empezar un intento.
-- **Videos:** se deben ver completos. Se pueden pausar y retroceder, pero no adelantar más allá de lo ya visto, y al volver continúan donde quedaron. El servidor solo acepta un avance posible en el tiempo real transcurrido (hasta 2x), así que no se puede marcar un video como visto con una sola petición.
+- **Videos:** se deben ver completos, a velocidad normal y en pantalla. Mientras no se completan, el reproductor no tiene pausa, ni barra para adelantar, ni cambio de velocidad: solo reproducir, volumen y pantalla completa. Si el alumno cambia de pestaña o de aplicación, o minimiza, el video se detiene y ese tiempo no cuenta; al volver, continúa desde donde quedó. El servidor solo acepta un avance posible en el tiempo real transcurrido (1x), así que hay que permanecer toda la duración del video. Una vez completado, el video se puede repasar con los controles normales.
 - **Presentaciones:** cuentan como vistas al abrirlas (o al descargarlas, si no se pudieron convertir).
 - La duración de cada video se lee en el navegador del profesor al subirlo. El subidor avisa antes de enviar si el archivo supera `MAX_VIDEO_MB`. En producción el límite es de 100 MB, porque Cloudflare corta las subidas más grandes: graba en 720p o comprime el video.
 
