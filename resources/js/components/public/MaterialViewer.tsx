@@ -295,8 +295,12 @@ function LinkViewer({ material, tracking }: { material: Material; tracking?: Tra
             )}
             <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 bg-card px-4 py-2.5 text-sm text-card-foreground/85">
                 <InfoIcon className="size-4 shrink-0 text-primary" />
-                <span className="min-w-0 flex-1">¿No se ve? Puede que la red de tu empresa bloquee {embed.provider}.</span>
-                <a href={material.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 font-semibold text-primary underline-offset-4 hover:underline">
+                <span className="min-w-0 flex-1">
+                    {embed.kind === 'page'
+                        ? '¿No se ve? Algunas páginas no se dejan mostrar dentro de otra: ábrela en otra pestaña.'
+                        : `¿No se ve? Puede que la red de tu empresa bloquee ${embed.provider}.`}
+                </span>
+                <a href={embed.href} target="_blank" rel="noreferrer" className="flex items-center gap-1 font-semibold text-primary underline-offset-4 hover:underline">
                     Abrir en otra pestaña
                     <ExternalLinkIcon className="size-3.5" />
                 </a>

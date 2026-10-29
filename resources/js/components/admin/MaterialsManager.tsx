@@ -21,7 +21,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Spinner } from '@/components/ui/spinner';
@@ -256,6 +256,7 @@ function AddLinkDialog({ courseId }: { courseId: number }) {
     const [url, setUrl] = useState('');
     const [title, setTitle] = useState('');
     const errors = validationErrors(add.error);
+    const embed = /^https:\/\/\S+\.\S+/.test(url.trim()) ? embedOf(url.trim()) : null;
 
     function submit(event: FormEvent) {
         event.preventDefault();
@@ -313,7 +314,16 @@ function AddLinkDialog({ courseId }: { courseId: number }) {
                                 required
                                 autoFocus
                             />
-                            {errors.url && <FieldError>{errors.url[0]}</FieldError>}
+                            {errors.url ? (
+                                <FieldError>{errors.url[0]}</FieldError>
+                            ) : embed?.kind === 'page' ? (
+                                <FieldDescription className="text-amber-600">
+                                    No parece un video de YouTube, Vimeo o Drive: se mostrará como página, y muchas no se dejan mostrar dentro del curso. Copia el enlace desde el botón
+                                    «Compartir» del video.
+                                </FieldDescription>
+                            ) : (
+                                embed && <FieldDescription>{embed.kind === 'video' ? 'Se mostrará como video.' : `Se mostrará con el reproductor de ${embed.provider}.`}</FieldDescription>
+                            )}
                         </Field>
                         <Field data-invalid={!!errors.title}>
                             <FieldLabel htmlFor="link-title">Título</FieldLabel>
